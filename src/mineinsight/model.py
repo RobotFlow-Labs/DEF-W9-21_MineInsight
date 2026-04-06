@@ -187,7 +187,7 @@ class FPNNeck(nn.Module):
 class DetectionHead(nn.Module):
     """Per-scale detection head predicting (x, y, w, h, obj, cls*num_classes)."""
 
-    def __init__(self, in_channels: list[int], num_classes: int = 35):
+    def __init__(self, in_channels: list[int], num_classes: int = 58):
         super().__init__()
         self.num_classes = num_classes
         out_ch = 5 + num_classes  # box(4) + obj(1) + cls(num_classes)
@@ -274,7 +274,7 @@ class SingleModalDetector(nn.Module):
     def __init__(
         self,
         in_channels: int = 3,
-        num_classes: int = 35,
+        num_classes: int = 58,
         base_width: int = 16,
     ):
         super().__init__()
@@ -310,7 +310,7 @@ class MultiModalDetector(nn.Module):
     def __init__(
         self,
         modalities: list[str],
-        num_classes: int = 35,
+        num_classes: int = 58,
         base_width: int = 16,
         fusion_method: str = "attention",
     ):
@@ -381,7 +381,7 @@ class YOLO26Wrapper(nn.Module):
     Adapts YOLO26 output format to match our (B, N, 5+C) per-scale format.
     """
 
-    def __init__(self, num_classes: int = 35, model_path: str = "yolo26n.pt"):
+    def __init__(self, num_classes: int = 58, model_path: str = "yolo26n.pt"):
         super().__init__()
         try:
             from ultralytics import YOLO
@@ -424,7 +424,7 @@ class YOLO26Wrapper(nn.Module):
 
 def build_model(
     modality: str = "rgb",
-    num_classes: int = 35,
+    num_classes: int = 58,
     base_width: int = 16,
     fusion_method: str = "attention",
     architecture: str = "yolov8",

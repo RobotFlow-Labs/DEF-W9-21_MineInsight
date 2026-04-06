@@ -5,7 +5,7 @@
 [model]
 architecture = "yolov8"
 backbone = "cspdarknet_nano"
-num_classes = 35
+num_classes = 58
 input_size = [640, 640]
 # Modalities: "rgb", "lwir", "swir", "rgb+lwir", "rgb+lwir+swir"
 modality = "rgb"

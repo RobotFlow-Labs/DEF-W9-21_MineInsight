@@ -5,7 +5,7 @@
 [model]
 architecture = "yolo26"
 backbone = "yolo26n"
-num_classes = 35
+num_classes = 58
 input_size = [640, 640]
 modality = "rgb"
 pretrained = "/mnt/forge-data/models/yolo26n.pt"

@@ -26,7 +26,7 @@ except ModuleNotFoundError:  # Python < 3.11 fallback
 class ModelConfig:
     architecture: str = "yolov8"
     backbone: str = "cspdarknet_nano"
-    num_classes: int = 35
+    num_classes: int = 58
     input_size: list[int] = field(default_factory=lambda: [640, 640])
     modality: str = "rgb"
     pretrained: str = ""

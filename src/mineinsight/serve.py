@@ -143,7 +143,7 @@ def main() -> None:
     args = parser.parse_args()
 
     _device = get_device()
-    _model = build_model("rgb", num_classes=35).to(_device)
+    _model = build_model("rgb", num_classes=58).to(_device)
     _model.eval()
 
     if args.checkpoint and Path(args.checkpoint).exists():

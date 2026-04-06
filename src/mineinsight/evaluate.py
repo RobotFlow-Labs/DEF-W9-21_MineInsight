@@ -122,7 +122,7 @@ def compute_map(
     all_detections: list[dict[str, torch.Tensor]],
     all_targets: list[torch.Tensor],
     all_target_counts: list[int],
-    num_classes: int = 35,
+    num_classes: int = 58,
     iou_threshold: float = 0.5,
 ) -> dict[str, float]:
     """Compute mAP at a given IoU threshold.

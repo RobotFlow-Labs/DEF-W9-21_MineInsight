@@ -169,7 +169,7 @@ class DetectionLoss(nn.Module):
 
     def __init__(
         self,
-        num_classes: int = 35,
+        num_classes: int = 58,
         box_weight: float = 7.5,
         cls_weight: float = 0.5,
         obj_weight: float = 1.0,

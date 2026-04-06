@@ -29,28 +29,46 @@ import torch
 from torch.utils.data import Dataset
 
 # --------------------------------------------------------------------------
-# Class names: 15 landmines + 20 distractor objects = 35 total
-# Indices 0-14 are landmines, 15-34 are distractors
+# --------------------------------------------------------------------------
+# MineInsight class mapping (from targets_list.yaml)
+# YOLO labels use per-target instance IDs (1-57), not sequential class IDs.
+# 35 physical targets: 15 landmines + 20 distractors across 3 tracks.
 # --------------------------------------------------------------------------
 
-MINE_CLASSES = [
-    "ap_mine_type1", "ap_mine_type2", "ap_mine_type3",
-    "ap_mine_type4", "ap_mine_type5", "ap_mine_type6",
-    "ap_mine_type7", "ap_mine_type8", "ap_mine_type9",
-    "at_mine_type1", "at_mine_type2", "at_mine_type3",
-    "at_mine_type4", "at_mine_type5", "at_mine_type6",
-]
+# Mine instance IDs (from targets_list.yaml)
+MINE_IDS = {
+    # PFM-1 (15 instances across tracks)
+    22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
+    # PMN
+    21, 43,
+    # M6
+    39, 40,
+    # TC-3.6, TMA-2, MON-90, Type 72P, TM-46, TMM-1, MON-50
+    41, 42, 46, 47, 45, 48, 44,
+    # C-3, PROM-1, M-35, VS-50 (Track 3)
+    55, 57, 52, 56, 53,
+}
 
-DISTRACTOR_CLASSES = [
-    "bottle", "can", "rock", "branch", "bag",
-    "tire", "shoe", "cloth", "metal_scrap", "plastic_container",
-    "wire", "glass_shard", "rubber_piece", "wood_block", "brick",
-    "pipe", "cardboard", "foam", "rope", "shell_casing",
-]
+# ID → human-readable name
+CLASS_NAMES: dict[int, str] = {
+    1: "Coke Can", 2: "Chips Bag", 3: "Tuna Can", 4: "Glass Jar",
+    5: "Chips Bag", 6: "Glass Jar", 7: "Pepper Dispenser", 8: "Corn Tin",
+    9: "Beer Bottle", 10: "Plastic Cup", 11: "Shampoo Bottle",
+    12: "Vinegar Bottle", 13: "Plastic Bottle", 14: "Plastic Bottle",
+    15: "Plastic Bottle", 16: "Soda Can", 17: "Metal Pot", 18: "Sponge",
+    19: "Paper Cup", 20: "Plastic Charger",
+    21: "PMN", 22: "PFM-1", 23: "PFM-1", 24: "PFM-1", 25: "PFM-1",
+    26: "PFM-1", 27: "PFM-1", 28: "PFM-1", 29: "PFM-1", 30: "PFM-1",
+    31: "PFM-1", 32: "PFM-1", 33: "PFM-1", 34: "PFM-1", 35: "PFM-1",
+    36: "PFM-1", 39: "M6", 40: "M6", 41: "TC-3.6", 42: "TMA-2",
+    43: "PMN", 44: "MON-50", 45: "TM-46", 46: "MON-90", 47: "Type 72P",
+    48: "TMM-1", 52: "PROM-1", 53: "VS-50", 55: "C-3", 56: "M-35", 57: "C-3",
+}
 
-ALL_CLASSES = MINE_CLASSES + DISTRACTOR_CLASSES
-NUM_CLASSES = len(ALL_CLASSES)  # 35
-MINE_CLASS_IDS = list(range(len(MINE_CLASSES)))  # 0..14
+# Max instance ID + 1 = number of output classes for the model
+NUM_CLASSES = 58  # IDs 0-57 (some IDs unused, that's fine)
+MINE_CLASS_IDS = sorted(MINE_IDS)
+ALL_CLASSES = [CLASS_NAMES.get(i, f"unused_{i}") for i in range(NUM_CLASSES)]
 
 
 def _parse_yolo_label(label_path: Path, img_w: int, img_h: int) -> torch.Tensor:

@@ -6,9 +6,7 @@ import pytest
 
 from mineinsight.dataset import (
     ALL_CLASSES,
-    DISTRACTOR_CLASSES,
-    MINE_CLASS_IDS,
-    MINE_CLASSES,
+    MINE_IDS,
     NUM_CLASSES,
     MineInsightDataset,
     _parse_yolo_label,
@@ -19,13 +17,16 @@ from mineinsight.utils import load_config
 
 class TestConstants:
     def test_class_counts(self):
-        assert len(MINE_CLASSES) == 15
-        assert len(DISTRACTOR_CLASSES) == 20
-        assert NUM_CLASSES == 35
-        assert len(ALL_CLASSES) == 35
+        assert NUM_CLASSES == 58  # IDs 0-57
+        assert len(ALL_CLASSES) == 58
 
     def test_mine_ids(self):
-        assert MINE_CLASS_IDS == list(range(15))
+        assert len(MINE_IDS) > 0
+        assert all(mid < NUM_CLASSES for mid in MINE_IDS)
+        # Known mine IDs from targets_list.yaml
+        assert 21 in MINE_IDS  # PMN
+        assert 42 in MINE_IDS  # TMA-2
+        assert 33 in MINE_IDS  # PFM-1
 
 
 class TestParseYoloLabel:
