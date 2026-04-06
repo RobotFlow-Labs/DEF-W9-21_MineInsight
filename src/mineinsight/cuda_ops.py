@@ -195,7 +195,7 @@ def cuda_nms_2d(
         area1 = (b1[:, 2:] - b1[:, :2]).prod(dim=-1)
         area2 = (b2[:, 2:] - b2[:, :2]).prod(dim=-1)
         iou = inter / (area1 + area2 - inter).clamp(min=1e-8)
-        order = rest[iou.squeeze() <= iou_threshold]
+        order = rest[iou.view(-1) <= iou_threshold]
     return torch.tensor(keep, dtype=torch.long, device=boxes.device)
 
 

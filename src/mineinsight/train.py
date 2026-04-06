@@ -87,20 +87,27 @@ def train_one_epoch(
     use_amp = precision in ("bf16", "fp16") and device.type == "cuda"
     amp_dtype = torch.bfloat16 if precision == "bf16" else torch.float16
 
+    is_multimodal = "images" in (loader.dataset[0] if len(loader.dataset) > 0 else {})
+
     for batch in loader:
-        images = batch["image"].to(device)
         targets = batch["targets"].to(device)
         target_counts = batch["target_counts"].to(device)
+
+        # Multi-modal: pass dict of modality tensors; single: pass concatenated tensor
+        if is_multimodal and "images" in batch:
+            model_input = {mod: t.to(device) for mod, t in batch["images"].items()}
+        else:
+            model_input = batch["image"].to(device)
 
         optimizer.zero_grad()
 
         if use_amp:
             with torch.amp.autocast("cuda", dtype=amp_dtype):
-                preds = model(images)
+                preds = model(model_input)
                 loss_dict = criterion(preds, targets, target_counts)
                 loss = loss_dict["loss"]
         else:
-            preds = model(images)
+            preds = model(model_input)
             loss_dict = criterion(preds, targets, target_counts)
             loss = loss_dict["loss"]
 
@@ -169,17 +176,23 @@ def validate(
     use_amp = precision in ("bf16", "fp16") and device.type == "cuda"
     amp_dtype = torch.bfloat16 if precision == "bf16" else torch.float16
 
+    is_multimodal = "images" in (loader.dataset[0] if len(loader.dataset) > 0 else {})
+
     for batch in loader:
-        images = batch["image"].to(device)
         targets = batch["targets"].to(device)
         target_counts = batch["target_counts"].to(device)
 
+        if is_multimodal and "images" in batch:
+            model_input = {mod: t.to(device) for mod, t in batch["images"].items()}
+        else:
+            model_input = batch["image"].to(device)
+
         if use_amp:
             with torch.amp.autocast("cuda", dtype=amp_dtype):
-                preds = model(images)
+                preds = model(model_input)
                 loss_dict = criterion(preds, targets, target_counts)
         else:
-            preds = model(images)
+            preds = model(model_input)
             loss_dict = criterion(preds, targets, target_counts)
 
         total_loss += loss_dict["loss"].item()

@@ -112,9 +112,10 @@ def _export_trt(
         return None
 
     import subprocess
+    import sys
 
     cmd = [
-        "python", str(trt_script),
+        sys.executable, str(trt_script),
         "--onnx", str(onnx_path),
         "--output", str(output_path),
         "--precision", precision,

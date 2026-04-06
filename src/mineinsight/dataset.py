@@ -153,7 +153,10 @@ class MineInsightDataset(Dataset):
                 img = cv2.imread(str(path))
                 if img is not None:
                     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        # Return blank image if not found (graceful fallback)
+        # Return blank image if not found (graceful fallback with warning)
+        import warnings
+
+        warnings.warn(f"Image not found: {img_dir}/{stem}.*, using blank", stacklevel=2)
         h, w = self.input_size
         return np.zeros((h, w, 3), dtype=np.uint8)
 

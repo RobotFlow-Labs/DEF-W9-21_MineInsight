@@ -98,8 +98,8 @@ def ciou_loss(
 
     # Aspect ratio consistency
     with torch.no_grad():
-        arctan_pred = torch.atan(pred_boxes[..., 2] / (pred_boxes[..., 3] + eps))
-        arctan_tgt = torch.atan(target_boxes[..., 2] / (target_boxes[..., 3] + eps))
+        arctan_pred = torch.atan2(pred_boxes[..., 2], pred_boxes[..., 3] + eps)
+        arctan_tgt = torch.atan2(target_boxes[..., 2], target_boxes[..., 3] + eps)
         v = (4 / (math.pi**2)) * (arctan_pred - arctan_tgt) ** 2
 
     alpha = v / (1 - iou + v + eps)

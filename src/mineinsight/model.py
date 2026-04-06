@@ -35,7 +35,7 @@ class Bottleneck(nn.Module):
         hidden = int(ch * expansion)
         self.cv1 = ConvBnSiLU(ch, hidden, 1, 1, 0)
         self.cv2 = ConvBnSiLU(hidden, ch, 3, 1, 1)
-        self.shortcut = shortcut and True
+        self.shortcut = shortcut
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.cv2(self.cv1(x))
@@ -258,7 +258,7 @@ class AddFusion(nn.Module):
     """Element-wise addition fusion (all modalities must have same channels)."""
 
     def forward(self, features: list[torch.Tensor]) -> torch.Tensor:
-        return sum(features)  # type: ignore[return-value]
+        return torch.stack(features).sum(0)
 
 
 # ---------------------------------------------------------------------------

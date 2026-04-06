@@ -58,8 +58,8 @@ focal_gamma = 2.0
 output_dir = "/mnt/artifacts-datai/checkpoints/project_mineinsight_fusion"
 save_every_n_steps = 500
 keep_top_k = 2
-metric = "val_mAP50"
-mode = "max"
+metric = "val_loss"
+mode = "min"
 
 [early_stopping]
 enabled = true

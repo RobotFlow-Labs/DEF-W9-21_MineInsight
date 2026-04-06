@@ -223,6 +223,10 @@ torch::Tensor fused_batch_multimodal_preprocess(
     torch::Tensor thermal
 ) {
     TORCH_CHECK(rgb.device().is_cuda(), "rgb must be on CUDA");
+    TORCH_CHECK(thermal.device().is_cuda(), "thermal must be on CUDA");
+    TORCH_CHECK(rgb.dtype() == torch::kByte, "rgb must be uint8");
+    TORCH_CHECK(thermal.dtype() == torch::kByte, "thermal must be uint8");
+    TORCH_CHECK(rgb.sizes() == thermal.sizes(), "rgb and thermal must have same shape");
     int B = rgb.size(0), H = rgb.size(1), W = rgb.size(2);
     auto output = torch::empty({B, 6, H, W}, torch::TensorOptions()
         .dtype(torch::kFloat32).device(rgb.device()));

@@ -34,7 +34,7 @@ dataset_root = "/mnt/train-data/datasets/mineinsight"
 # Track 1 Seq 1 (day) + Track 2 Seq 1 (day) available initially
 # Will split track1_seq1 into train/val, track2_seq1 as test
 train_sequences = ["track1_seq1"]
-val_sequences = ["track1_seq1"]   # NOTE: will use separate frame split within sequence
+val_sequences = ["track2_seq1"]
 test_sequences = ["track2_seq1"]
 num_workers = 4
 pin_memory = true
@@ -62,8 +62,8 @@ focal_gamma = 2.0
 output_dir = "/mnt/artifacts-datai/checkpoints/project_mineinsight"
 save_every_n_steps = 500
 keep_top_k = 2
-metric = "val_mAP50"
-mode = "max"
+metric = "val_loss"
+mode = "min"
 
 [early_stopping]
 enabled = true

@@ -159,9 +159,7 @@ def compute_map(
                 continue
 
             # Convert gt to xyxy for IoU
-            from mineinsight.losses import box_cxcywh_to_xyxy as to_xyxy
-
-            gt_xyxy = to_xyxy(gt_boxes)
+            gt_xyxy = box_cxcywh_to_xyxy(gt_boxes)
 
             # Sort detections by score
             order = det_scores.argsort(descending=True)

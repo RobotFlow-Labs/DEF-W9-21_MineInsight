@@ -57,8 +57,8 @@ focal_gamma = 2.0
 output_dir = "/mnt/artifacts-datai/checkpoints/project_mineinsight_debug"
 save_every_n_steps = 50
 keep_top_k = 1
-metric = "val_mAP50"
-mode = "max"
+metric = "val_loss"
+mode = "min"
 
 [early_stopping]
 enabled = false

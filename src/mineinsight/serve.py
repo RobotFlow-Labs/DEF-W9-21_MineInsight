@@ -86,7 +86,23 @@ def _get_app() -> FastAPI:
             )
 
         contents = await file.read()
-        img = Image.open(io.BytesIO(contents)).convert("RGB")
+
+        # Security: limit upload size to 10 MB
+        max_size = 10 * 1024 * 1024
+        if len(contents) > max_size:
+            return JSONResponse(
+                content={"error": f"File too large (max {max_size} bytes)"},
+                status_code=413,
+            )
+
+        # Validate image content
+        try:
+            img = Image.open(io.BytesIO(contents)).convert("RGB")
+        except Exception:
+            return JSONResponse(
+                content={"error": "Invalid image file"},
+                status_code=400,
+            )
         img_np = np.array(img)
 
         # Preprocess
