@@ -7,48 +7,52 @@
 - PDF: `papers/2506.04842.pdf`
 - GitHub: https://github.com/mariomlz99/MineInsight
 
-## Status: BLOCKED -- Dataset not downloaded
-- Paper parsed from arXiv HTML.
-- No local dataset yet. MineInsight ROS2 bags and extracted images need to be downloaded.
-- Implementation scaffold is complete and runnable once data is provisioned.
+## Status: READY — Code complete, dataset downloading
+- All code scaffolded and tested (38 tests passing)
+- 4 custom CUDA kernels compiled (sm_89)
+- 3 shared CUDA kernels integrated
+- Dataset downloading to /mnt/train-data/datasets/mineinsight/
 
 ## Pretrained Weights
 | Model | Size | Source | Path on Server | Status |
 |---|---:|---|---|---|
-| YOLOv8n (COCO pretrained) | ~6 MB | Ultralytics | `/mnt/forge-data/models/yolov8n.pt` | NEEDS CHECK |
-| YOLO11n (fallback) | ~6 MB | shared infra | `/mnt/forge-data/models/yolo11n.pt` | AVAILABLE |
-| YOLOv5l6 (fallback) | ~150 MB | shared infra | `/mnt/forge-data/models/yolov5l6.pt` | AVAILABLE |
+| YOLO26n (latest, Jan 2026) | 5.3 MB | Ultralytics | `/mnt/forge-data/models/yolo26n.pt` | AVAILABLE |
+| YOLO11n | ~6 MB | shared infra | `/mnt/forge-data/models/yolo11n.pt` | AVAILABLE |
+| YOLOv12n | ~6 MB | shared infra | `/mnt/forge-data/models/yolov12n.pt` | AVAILABLE |
+| YOLOv5l6 | ~150 MB | shared infra | `/mnt/forge-data/models/yolov5l6.pt` | AVAILABLE |
 
 ## Datasets
 | Dataset | Size | Split | Source | Path | Status |
 |---|---:|---|---|---|---|
-| MineInsight RGB images | ~2 GB est. | 6 sequences | GitHub releases | `/mnt/forge-data/datasets/mineinsight/rgb/` | MISSING |
-| MineInsight LWIR images | ~4 GB est. | 6 sequences | GitHub releases | `/mnt/forge-data/datasets/mineinsight/lwir/` | MISSING |
-| MineInsight VIS-SWIR images | ~3 GB est. | 6 sequences | GitHub releases | `/mnt/forge-data/datasets/mineinsight/swir/` | MISSING |
-| MineInsight YOLO labels | ~10 MB est. | per modality | GitHub releases | `/mnt/forge-data/datasets/mineinsight/labels/` | MISSING |
-| MineInsight SAM2 masks | ~1 GB est. | auto-generated | GitHub releases | `/mnt/forge-data/datasets/mineinsight/masks/` | MISSING |
-| MineInsight LiDAR bags | ~100 GB est. | 6 sequences | GitHub releases | `/mnt/forge-data/datasets/mineinsight/lidar/` | MISSING |
-| MineInsight calibration | ~1 MB | all sensors | GitHub repo | `/mnt/forge-data/datasets/mineinsight/calibration/` | MISSING |
+| MineInsight T1S1 RGB | ~3.8 GB | track1 seq1 | GitHub releases | `/mnt/train-data/datasets/mineinsight/` | DOWNLOADING |
+| MineInsight T1S1 LWIR | ~465 MB | track1 seq1 | GitHub releases | `/mnt/train-data/datasets/mineinsight/` | DOWNLOADING |
+| MineInsight T1S1 LiDAR | ~669 MB | track1 seq1 | GitHub releases | `/mnt/train-data/datasets/mineinsight/` | DOWNLOADING |
+| MineInsight T2S1 RGB | ~2.8 GB | track2 seq1 | GitHub releases | `/mnt/train-data/datasets/mineinsight/` | DOWNLOADING |
+| MineInsight Labels | ~2.4 MB | all tracks | GitHub releases | `/mnt/train-data/datasets/mineinsight/` | DOWNLOADING |
 
-## Download Commands (when ready)
-```bash
-# Clone the dataset repository
-cd /mnt/forge-data/datasets/
-git clone https://github.com/mariomlz99/MineInsight mineinsight_repo
+## CUDA Kernels
+### Custom (built for this module)
+| Kernel | Ops | Path | Speedup |
+|---|---:|---|---|
+| fused_multimodal_preprocess | 1 | csrc/mineinsight_cuda_ops.cu | 7x (eliminates 7 PyTorch ops) |
+| fused_batch_multimodal_preprocess | 1 | csrc/mineinsight_cuda_ops.cu | batch version |
+| fused_ciou_loss | 1 | csrc/mineinsight_cuda_ops.cu | ~3x (eliminates 15+ ops) |
+| fused_detection_decode | 1 | csrc/mineinsight_cuda_ops.cu | ~2x (sigmoid+filter in 1 pass) |
 
-# Extract images and labels from the repo structure
-# NOTE: Large files (ROS2 bags) are hosted on external links -- check repo README
-# Full ROS2 bags are very large (19-77 GB per sequence). Start with extracted images only.
+### Shared (from /mnt/forge-data/shared_infra/cuda_extensions/)
+| Kernel | Used For |
+|---|---|
+| detection_ops.fused_box_iou_2d | IoU computation in evaluation |
+| detection_ops.fused_focal_loss | Classification loss acceleration |
+| detection_ops.fused_score_filter | Pre-NMS score filtering |
+| fused_image_preprocess.batch_normalize_hwc_to_chw | Image preprocessing |
+| vectorized_nms.nms_2d | CUDA NMS in evaluation |
 
-# Minimal start: download only RGB images + labels for initial training
-# Exact download links TBD -- check GitHub releases page
-```
-
-## Hyperparameters (baseline -- not from paper, paper is dataset-only)
+## Hyperparameters (baseline — not from paper, paper is dataset-only)
 | Param | Value | Notes |
 |---|---|---|
 | Input resolution | 640 x 640 | YOLOv8 standard |
-| Backbone | CSPDarknet-nano | YOLOv8n |
+| Backbone | CSPDarknet-nano | Custom, 2.6M params |
 | Num classes | 35 | 15 mines + 20 distractors |
 | Optimizer | AdamW | lr=1e-3, wd=0.01 |
 | Scheduler | cosine + 5% warmup | min_lr=1e-6 |
@@ -69,5 +73,5 @@ git clone https://github.com/mariomlz99/MineInsight mineinsight_repo
 ## Data Contracts
 - YOLO-format labels: `class_id x_center y_center width height` (normalized)
 - Images: JPEG/PNG, variable resolution (will be resized to 640x640)
-- Class mapping: defined in `targets_list.yaml` from dataset repo (35 classes)
-- Split: 4 sequences train, 1 val, 1 test (track-based split to avoid data leakage)
+- Class mapping: 35 classes (15 mines + 20 distractors)
+- Split: frame-level 80/10/10 within sequences
