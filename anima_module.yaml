@@ -1,0 +1,44 @@
+module:
+  id: DEF-mineinsight
+  name: MineInsight
+  type: defense
+  task: multi_modal_landmine_detection
+  version: 0.1.0
+
+io:
+  inputs:
+    - name: rgb_frame
+      type: image/rgb
+      topic: /camera/rgb/image
+    - name: lwir_frame
+      type: image/thermal
+      topic: /camera/lwir/image
+    - name: swir_frame
+      type: image/swir
+      topic: /camera/swir/image
+    - name: pointcloud
+      type: sensor_msgs/PointCloud2
+      topic: /lidar/points
+  outputs:
+    - name: detections
+      type: bbox_list
+      topic: /defense/mineinsight/detections
+    - name: mine_alerts
+      type: alert_list
+      topic: /defense/mineinsight/mine_alerts
+
+runtime:
+  python_entrypoint: mineinsight.serve:main
+  supports:
+    - cpu
+    - cuda
+
+docker:
+  image: anima-mineinsight
+  base: ghcr.io/robotflow-labs/anima-serve:jazzy
+  port: 8080
+
+ros2:
+  package: anima_mineinsight
+  node: mineinsight_node
+  namespace: /defense

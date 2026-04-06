@@ -1,0 +1,30 @@
+FROM nvidia/cuda:12.4.0-devel-ubuntu22.04 AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 python3.11-dev python3.11-venv python3-pip gcc-12 g++-12 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY . .
+
+RUN python3.11 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH" CC=gcc-12 CXX=g++-12
+
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+RUN pip install --no-cache-dir -e ".[dev]"
+RUN python csrc/setup.py build_ext --inplace
+
+FROM nvidia/cuda:12.4.0-runtime-ubuntu22.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 python3.11-venv libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app /app
+WORKDIR /app
+ENV PATH="/opt/venv/bin:$PATH"
+
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:8080/health || exit 1
+CMD ["python", "-m", "mineinsight.serve", "--port", "8080"]

@@ -1,0 +1,11 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY . .
+
+RUN pip install --no-cache-dir -e . \
+    && pip install --no-cache-dir mlx mlx-nn
+
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:8080/health || exit 1
+CMD ["python", "-m", "mineinsight.serve", "--port", "8080"]

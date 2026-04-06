@@ -1,0 +1,32 @@
+# MineInsight Detection — Serving Container
+# Layer 3: Module-specific (on top of anima-serve:jazzy)
+
+FROM ghcr.io/robotflow-labs/anima-serve:jazzy AS base
+
+# Module metadata
+ENV ANIMA_MODULE_NAME=mineinsight \
+    ANIMA_MODULE_VERSION=0.1.0 \
+    ANIMA_HF_REPO=ilessio-aiflowlab/project_mineinsight \
+    ANIMA_SERVE_PORT=8080 \
+    ANIMA_DEVICE=auto \
+    ANIMA_WEIGHT_FORMAT=auto
+
+WORKDIR /app
+
+# Install module dependencies
+COPY pyproject.toml .
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system -e ".[dev]" || true
+
+# Copy module source
+COPY src/ src/
+COPY configs/ configs/
+COPY scripts/ scripts/
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:${ANIMA_SERVE_PORT}/health || exit 1
+
+EXPOSE ${ANIMA_SERVE_PORT}
+
+CMD ["python", "-m", "mineinsight.serve"]

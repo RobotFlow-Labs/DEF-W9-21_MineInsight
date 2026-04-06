@@ -1,0 +1,33 @@
+version: "3.8"
+
+services:
+  mineinsight-cuda:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cuda
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    ports:
+      - "8080:8080"
+    volumes:
+      - /mnt/artifacts-datai/checkpoints/project_mineinsight:/checkpoints:ro
+    command: >
+      python -m mineinsight.serve
+      --port 8080
+      --checkpoint /checkpoints/best.pth
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+
+  mineinsight-mlx:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mlx
+    ports:
+      - "8081:8080"
+    command: >
+      python -m mineinsight.serve
+      --port 8080

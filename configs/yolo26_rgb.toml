@@ -1,0 +1,72 @@
+# MineInsight YOLO26n single-modal RGB config
+# Uses Ultralytics YOLO26n (2.6M params, NMS-free, Jan 2026)
+# For single-modal baseline comparison against our custom fusion model.
+
+[model]
+architecture = "yolo26"
+backbone = "yolo26n"
+num_classes = 35
+input_size = [640, 640]
+modality = "rgb"
+pretrained = "/mnt/forge-data/models/yolo26n.pt"
+
+[model.fusion]
+enabled = false
+method = "concat"
+fusion_channels = 256
+
+[training]
+batch_size = "auto"
+learning_rate = 0.001
+epochs = 100
+optimizer = "adamw"
+weight_decay = 0.01
+scheduler = "cosine"
+warmup_ratio = 0.05
+precision = "bf16"
+gradient_accumulation = 1
+max_grad_norm = 1.0
+seed = 42
+
+[data]
+dataset_root = "/mnt/train-data/datasets/mineinsight"
+train_sequences = ["track1_seq1"]
+val_sequences = ["track1_seq1"]
+test_sequences = ["track2_seq1"]
+num_workers = 4
+pin_memory = true
+
+[data.augmentation]
+mosaic = true
+mixup = true
+hsv_h = 0.015
+hsv_s = 0.7
+hsv_v = 0.4
+flip_lr = 0.5
+flip_ud = 0.0
+scale = [0.5, 1.5]
+
+[loss]
+box_weight = 7.5
+cls_weight = 0.5
+obj_weight = 1.0
+box_loss = "ciou"
+cls_loss = "focal"
+focal_alpha = 0.25
+focal_gamma = 2.0
+
+[checkpoint]
+output_dir = "/mnt/artifacts-datai/checkpoints/project_mineinsight_yolo26"
+save_every_n_steps = 500
+keep_top_k = 2
+metric = "val_mAP50"
+mode = "max"
+
+[early_stopping]
+enabled = true
+patience = 20
+min_delta = 0.001
+
+[logging]
+log_dir = "/mnt/artifacts-datai/logs/project_mineinsight_yolo26"
+tensorboard_dir = "/mnt/artifacts-datai/tensorboard/project_mineinsight_yolo26"

@@ -1,0 +1,70 @@
+# MineInsight debug config -- quick smoke test
+
+[model]
+architecture = "yolov8"
+backbone = "cspdarknet_nano"
+num_classes = 35
+input_size = [640, 640]
+modality = "rgb"
+pretrained = ""
+
+[model.fusion]
+enabled = false
+method = "concat"
+fusion_channels = 256
+
+[training]
+batch_size = 4
+learning_rate = 0.001
+epochs = 2
+optimizer = "adamw"
+weight_decay = 0.01
+scheduler = "cosine"
+warmup_ratio = 0.05
+precision = "fp32"
+gradient_accumulation = 1
+max_grad_norm = 1.0
+seed = 42
+
+[data]
+dataset_root = "/mnt/train-data/datasets/mineinsight"
+train_sequences = ["track1_seq1"]
+val_sequences = ["track2_seq1"]
+test_sequences = ["track2_seq1"]
+num_workers = 2
+pin_memory = false
+
+[data.augmentation]
+mosaic = false
+mixup = false
+hsv_h = 0.0
+hsv_s = 0.0
+hsv_v = 0.0
+flip_lr = 0.5
+flip_ud = 0.0
+scale = [1.0, 1.0]
+
+[loss]
+box_weight = 7.5
+cls_weight = 0.5
+obj_weight = 1.0
+box_loss = "ciou"
+cls_loss = "focal"
+focal_alpha = 0.25
+focal_gamma = 2.0
+
+[checkpoint]
+output_dir = "/mnt/artifacts-datai/checkpoints/project_mineinsight_debug"
+save_every_n_steps = 50
+keep_top_k = 1
+metric = "val_mAP50"
+mode = "max"
+
+[early_stopping]
+enabled = false
+patience = 5
+min_delta = 0.001
+
+[logging]
+log_dir = "/mnt/artifacts-datai/logs/project_mineinsight_debug"
+tensorboard_dir = "/mnt/artifacts-datai/tensorboard/project_mineinsight_debug"
