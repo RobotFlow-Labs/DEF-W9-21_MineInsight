@@ -31,11 +31,10 @@ seed = 42
 
 [data]
 dataset_root = "/mnt/train-data/datasets/mineinsight"
-# Track 1 Seq 1 (day) + Track 2 Seq 1 (day) available initially
-# Will split track1_seq1 into train/val, track2_seq1 as test
-train_sequences = ["track1_seq1"]
-val_sequences = ["track2_seq1"]
-test_sequences = ["track2_seq1"]
+# Actual directory names from MineInsight dataset
+train_sequences = ["track_1_s1"]
+val_sequences = ["track_2_s1"]
+test_sequences = ["track_2_s1"]
 num_workers = 4
 pin_memory = true
 

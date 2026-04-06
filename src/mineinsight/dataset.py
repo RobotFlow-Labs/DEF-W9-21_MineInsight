@@ -148,11 +148,47 @@ class MineInsightDataset(Dataset):
             return modality.split("+")
         return [modality]
 
+    def _find_img_dir(self, modality: str, seq: str) -> Path | None:
+        """Find the image directory for a given modality and sequence.
+
+        Supports two layouts:
+          Flat:   root/track_1_s1_rgb_images/
+          Nested: root/rgb/track1_seq1/images/
+        """
+        # Flat layout: root/{seq}_{modality}_images/
+        flat = self.root / f"{seq}_{modality}_images"
+        if flat.exists():
+            return flat
+        # Nested layout: root/{modality}/{seq}/images/
+        nested = self.root / modality / seq / "images"
+        if nested.exists():
+            return nested
+        return None
+
+    def _find_label_dir(self, modality: str, seq: str) -> Path | None:
+        """Find the label directory for a given modality and sequence.
+
+        Supports:
+          root/{seq}_{modality}_labels_reproj/   (preferred for LWIR)
+          root/{seq}_{modality}_labels/
+          root/{modality}/{seq}/labels/           (nested)
+        """
+        reproj = self.root / f"{seq}_{modality}_labels_reproj"
+        if reproj.exists():
+            return reproj
+        flat = self.root / f"{seq}_{modality}_labels"
+        if flat.exists():
+            return flat
+        nested = self.root / modality / seq / "labels"
+        if nested.exists():
+            return nested
+        return None
+
     def _build_index(self, sequences: list[str]) -> None:
         """Scan filesystem and build list of (sequence, image_stem) pairs."""
         for seq in sequences:
-            img_dir = self.root / self.primary / seq / "images"
-            if not img_dir.exists():
+            img_dir = self._find_img_dir(self.primary, seq)
+            if img_dir is None:
                 continue
             for img_file in sorted(img_dir.iterdir()):
                 if img_file.suffix.lower() in (".jpg", ".jpeg", ".png", ".bmp", ".tif"):
@@ -163,18 +199,22 @@ class MineInsightDataset(Dataset):
 
     def _load_image(self, modality: str, seq: str, stem: str) -> np.ndarray:
         """Load an image for a given modality, sequence, and file stem."""
-        img_dir = self.root / modality / seq / "images"
-        # Try common extensions
-        for ext in (".jpg", ".jpeg", ".png", ".bmp", ".tif"):
-            path = img_dir / f"{stem}{ext}"
-            if path.exists():
-                img = cv2.imread(str(path))
-                if img is not None:
-                    return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        # Return blank image if not found (graceful fallback with warning)
+        img_dir = self._find_img_dir(modality, seq)
+        if img_dir is not None:
+            # The stem may have the primary modality prefix; try modality-specific stem
+            mod_stem = stem.replace(f"_{self.primary}_", f"_{modality}_")
+            for candidate_stem in (stem, mod_stem):
+                for ext in (".jpg", ".jpeg", ".png", ".bmp", ".tif"):
+                    path = img_dir / f"{candidate_stem}{ext}"
+                    if path.exists():
+                        img = cv2.imread(str(path))
+                        if img is not None:
+                            return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         import warnings
 
-        warnings.warn(f"Image not found: {img_dir}/{stem}.*, using blank", stacklevel=2)
+        warnings.warn(
+            f"Image not found: {modality}/{seq}/{stem}.*, using blank", stacklevel=2,
+        )
         h, w = self.input_size
         return np.zeros((h, w, 3), dtype=np.uint8)
 
@@ -205,8 +245,12 @@ class MineInsightDataset(Dataset):
         primary_img = self._load_image(self.primary, seq, stem)
         h_orig, w_orig = primary_img.shape[:2]
 
-        # Load labels (from primary modality)
-        label_path = self.root / self.primary / seq / "labels" / f"{stem}.txt"
+        # Load labels (from primary modality) — search flat + nested layouts
+        label_dir = self._find_label_dir(self.primary, seq)
+        if label_dir is not None:
+            label_path = label_dir / f"{stem}.txt"
+        else:
+            label_path = self.root / self.primary / seq / "labels" / f"{stem}.txt"
         targets = _parse_yolo_label(label_path, w_orig, h_orig)
 
         # Load and resize all modality images
