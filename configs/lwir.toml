@@ -8,7 +8,7 @@ backbone = "cspdarknet_nano"
 num_classes = 58
 input_size = [640, 640]
 # Modalities: "rgb", "lwir", "swir", "rgb+lwir", "rgb+lwir+swir"
-modality = "rgb"
+modality = "lwir"
 pretrained = ""  # Custom CSPDarknet-nano backbone, trained from scratch
 
 [model.fusion]
@@ -58,7 +58,7 @@ focal_alpha = 0.25
 focal_gamma = 2.0
 
 [checkpoint]
-output_dir = "/mnt/artifacts-datai/checkpoints/project_mineinsight"
+output_dir = "/mnt/artifacts-datai/checkpoints/project_mineinsight_lwir"
 save_every_n_steps = 500
 keep_top_k = 2
 metric = "val_loss"
@@ -70,5 +70,5 @@ patience = 20
 min_delta = 0.001
 
 [logging]
-log_dir = "/mnt/artifacts-datai/logs/project_mineinsight"
-tensorboard_dir = "/mnt/artifacts-datai/tensorboard/project_mineinsight"
+log_dir = "/mnt/artifacts-datai/logs/project_mineinsight_lwir"
+tensorboard_dir = "/mnt/artifacts-datai/tensorboard/project_mineinsight_lwir"

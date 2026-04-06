@@ -41,7 +41,7 @@ def find_optimal_batch_size(
     from mineinsight.model import build_model
 
     device = torch.device("cuda")
-    total_vram = torch.cuda.get_device_properties(device).total_mem
+    total_vram = torch.cuda.get_device_properties(device).total_memory
     target_bytes = total_vram * target_vram_ratio
     gpu_name = torch.cuda.get_device_name(device)
 
