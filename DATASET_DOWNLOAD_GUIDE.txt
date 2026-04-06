@@ -1,0 +1,191 @@
+================================================================================
+MineInsight Dataset Download Guide (arXiv:2506.04842)
+================================================================================
+
+QUICK SUMMARY:
+- 38,000 RGB frames (Tracks 1-2 only)
+- 53,000 VIS-SWIR frames (all tracks)
+- 108,000 LWIR thermal frames (all tracks)
+- 35 target classes (15 mines + 20 distractors)
+- 6 sequences total (2 per track x 3 tracks)
+- YOLOv8 bounding box annotations + SAM2 segmentation masks
+
+MINIMUM DOWNLOAD (RGB + LWIR + Labels):
+  Total: ~44 GB
+  - RGB images (4 sequences): 34.4 GB
+  - LWIR images (6 sequences): 9.3 GB
+  - All labels: ~56 MB
+
+FULL DOWNLOAD (all modalities + masks):
+  Total: ~56 GB
+  - Add VIS-SWIR: 11.7 GB
+  - Add SAM2 masks: 115 MB
+
+================================================================================
+DOWNLOAD LINKS (grouped by sequence)
+================================================================================
+
+TRACK 1 - SEQUENCE 1 (4.6 GB total, minimal)
+  RGB Images:    https://mineinsight.short.gy/6Mvbjx (3.8 GB)
+  RGB Labels:    https://mineinsight.short.gy/Cy5OeN (1.2 MB)
+  LWIR Images:   https://mineinsight.short.gy/LV5XZ1 (669 MB)
+  LWIR Labels:   https://mineinsight.short.gy/Z8fqcY (2.5 MB)
+  RGB Masks:     https://mineinsight.short.gy/WsrVwa (4.8 MB)
+
+TRACK 1 - SEQUENCE 2 (15.1 GB total, minimal) [LARGE]
+  RGB Images:    https://mineinsight.short.gy/RBRY3I (12.0 GB)
+  RGB Labels:    https://mineinsight.short.gy/ncoHYs (6.5 MB)
+  LWIR Images:   https://mineinsight.short.gy/PYfYwf (3.0 GB)
+  LWIR Labels:   https://mineinsight.short.gy/bYpES1 (12.2 MB)
+  RGB Masks:     https://mineinsight.short.gy/3gyaZh (27.2 MB)
+
+TRACK 2 - SEQUENCE 1 (3.4 GB total, minimal)
+  RGB Images:    https://mineinsight.short.gy/OKXGyT (2.8 GB)
+  RGB Labels:    https://mineinsight.short.gy/yJ4vKD (1.2 MB)
+  LWIR Images:   https://mineinsight.short.gy/Tkb2ra (520 MB)
+  LWIR Labels:   https://mineinsight.short.gy/00s2Te (2.3 MB)
+  RGB Masks:     https://mineinsight.short.gy/T1FSPQ (4.7 MB)
+
+TRACK 2 - SEQUENCE 2 (18.2 GB total, minimal) [LARGE]
+  RGB Images:    https://mineinsight.short.gy/mZSLV8 (15.8 GB)
+  RGB Labels:    https://mineinsight.short.gy/5ZEVE9 (8.7 MB)
+  LWIR Images:   https://mineinsight.short.gy/CuoFOX (2.3 GB)
+  LWIR Labels:   https://mineinsight.short.gy/uvLeoo (12.2 MB)
+  RGB Masks:     https://mineinsight.short.gy/kjBs2N (42 MB)
+
+TRACK 3 - SEQUENCE 1 (568 MB, LWIR ONLY - no RGB)
+  LWIR Images:   https://mineinsight.short.gy/UoD78c (566 MB)
+  LWIR Labels:   https://mineinsight.short.gy/caHk6F (2.0 MB)
+
+TRACK 3 - SEQUENCE 2 (2.0 GB, LWIR ONLY - no RGB)
+  LWIR Images:   https://mineinsight.short.gy/1XFhHc (2.0 GB)
+  LWIR Labels:   https://mineinsight.short.gy/aT8QZL (7.3 MB)
+
+VIS-SWIR IMAGES (optional, add 11.7 GB):
+  T1 S1: https://mineinsight.short.gy/bYB63R (465 MB)
+  T1 S2: https://mineinsight.short.gy/rB9si6 (4.2 GB)
+  T2 S1: https://mineinsight.short.gy/ZoJg2h (872 MB)
+  T2 S2: https://mineinsight.short.gy/DIObFu (2.9 GB)
+  T3 S1: https://mineinsight.short.gy/aX73E (630 MB)
+  T3 S2: https://mineinsight.short.gy/ewHM2o (2.6 GB)
+
+================================================================================
+RECOMMENDED DOWNLOAD COMMAND (Minimal: 44 GB)
+================================================================================
+
+#!/bin/bash
+mkdir -p /mnt/forge-data/datasets/mineinsight
+cd /mnt/forge-data/datasets/mineinsight
+
+# Check space first
+echo "Free space:"
+df -h /mnt/forge-data
+
+# Download all tracks (RGB + LWIR only)
+for url in \
+  "https://mineinsight.short.gy/6Mvbjx:track_1_s1_rgb.zip" \
+  "https://mineinsight.short.gy/Cy5OeN:track_1_s1_rgb_labels.zip" \
+  "https://mineinsight.short.gy/LV5XZ1:track_1_s1_lwir.zip" \
+  "https://mineinsight.short.gy/Z8fqcY:track_1_s1_lwir_labels.zip" \
+  "https://mineinsight.short.gy/RBRY3I:track_1_s2_rgb.zip" \
+  "https://mineinsight.short.gy/ncoHYs:track_1_s2_rgb_labels.zip" \
+  "https://mineinsight.short.gy/PYfYwf:track_1_s2_lwir.zip" \
+  "https://mineinsight.short.gy/bYpES1:track_1_s2_lwir_labels.zip" \
+  "https://mineinsight.short.gy/OKXGyT:track_2_s1_rgb.zip" \
+  "https://mineinsight.short.gy/yJ4vKD:track_2_s1_rgb_labels.zip" \
+  "https://mineinsight.short.gy/Tkb2ra:track_2_s1_lwir.zip" \
+  "https://mineinsight.short.gy/00s2Te:track_2_s1_lwir_labels.zip" \
+  "https://mineinsight.short.gy/mZSLV8:track_2_s2_rgb.zip" \
+  "https://mineinsight.short.gy/5ZEVE9:track_2_s2_rgb_labels.zip" \
+  "https://mineinsight.short.gy/CuoFOX:track_2_s2_lwir.zip" \
+  "https://mineinsight.short.gy/uvLeoo:track_2_s2_lwir_labels.zip" \
+  "https://mineinsight.short.gy/UoD78c:track_3_s1_lwir.zip" \
+  "https://mineinsight.short.gy/caHk6F:track_3_s1_lwir_labels.zip" \
+  "https://mineinsight.short.gy/1XFhHc:track_3_s2_lwir.zip" \
+  "https://mineinsight.short.gy/aT8QZL:track_3_s2_lwir_labels.zip"
+do
+  IFS=':' read -r link filename <<< "$url"
+  echo "Downloading $filename..."
+  wget -O "$filename" "$link"
+done
+
+echo "Extracting all files..."
+unzip -q "*.zip"
+rm *.zip
+
+# Get calibration and targets
+REPO="https://raw.githubusercontent.com/mariomlz99/MineInsight/main"
+wget -O targets_list.yaml "$REPO/tracks_inventory/targets_list.yaml"
+
+mkdir -p intrinsics_calibration extrinsics_calibration
+wget -O intrinsics_calibration/rgb_camera_intrinsics.yaml \
+  "$REPO/intrinsics_calibration/rgb_camera_intrinsics.yaml"
+wget -O intrinsics_calibration/lwir_camera_intrinsics.yaml \
+  "$REPO/intrinsics_calibration/lwir_camera_intrinsics.yaml"
+
+echo "Complete! Dataset at /mnt/forge-data/datasets/mineinsight"
+
+================================================================================
+KEY INFORMATION FOR TRAINING
+================================================================================
+
+TARGETS MAPPING:
+  - 35 total classes (IDs: 1-48)
+  - Track 1: 23 targets (PFM-1 mines + household items)
+  - Track 2: 20 targets (MON-90, MON-50 mines + items)
+  - Track 3: 5 targets (C-3, M-35, PROM-1, VS-50 mines)
+  - Get mapping from: targets_list.yaml
+
+ANNOTATION FORMAT (YOLOv8):
+  Each .txt file contains:
+  <class_id> <x_center_normalized> <y_center_normalized> <width_normalized> <height_normalized>
+
+IMPORTANT NOTES:
+  - Track 3 has NO RGB images (camera failure) - LWIR only
+  - LWIR labels exist in two variants:
+    * Reprojected (recommended): geometrically consistent
+    * Automatic: pipeline-generated, denser
+  - SAM2 masks available for RGB/SWIR on Tracks 1-2 only
+  - Dataset v2 (Feb 2026) with 437,000+ revised labels
+  - All images are RGB/LWIR/SWIR .jpg format
+
+EXPECTED DOWNLOAD TIME:
+  - Minimal (44 GB) on 100 Mbps: ~2-3 hours
+  - Full (56 GB) on 100 Mbps: ~3-4 hours
+  - Largest single file: Track 1 Seq 2 RGB (12 GB) and Track 2 Seq 2 RGB (15.8 GB)
+
+================================================================================
+DIRECTORY STRUCTURE AFTER DOWNLOAD
+================================================================================
+
+/mnt/forge-data/datasets/mineinsight/
+├── track_1_s1_rgb/           # RGB images
+├── track_1_s1_rgb_labels/    # YOLOv8 labels
+├── track_1_s1_lwir/          # Thermal images
+├── track_1_s1_lwir_labels_reproj/  # Reprojected LWIR labels
+├── track_1_s1_swir/          # Optional: VIS-SWIR
+├── track_1_s1_rgb_masks/     # Optional: SAM2 segmentation masks
+│
+├── track_1_s2_*/ ... (same structure)
+├── track_2_s1_*/ ... (same structure)
+├── track_2_s2_*/ ... (same structure)
+├── track_3_s1_lwir/          # Track 3: LWIR only, no RGB
+├── track_3_s2_lwir/
+│
+├── targets_list.yaml         # Class ID -> target name mapping
+├── intrinsics_calibration/   # Camera intrinsics (YAML)
+└── extrinsics_calibration/   # Camera extrinsics (YAML)
+
+================================================================================
+REFERENCES
+================================================================================
+
+GitHub Repository: https://github.com/mariomlz99/MineInsight
+Paper (arXiv): https://arxiv.org/abs/2506.04842
+Published: IEEE RA-L (Dec 2025), Accepted to ICRA 2026
+
+Citation:
+  López-Zazueta, M., et al. (2025). MineInsight: A Multi-sensor Dataset for 
+  Humanitarian Demining Robotics in Off-Road Environments. 
+  IEEE Robotics and Automation Letters.
+
