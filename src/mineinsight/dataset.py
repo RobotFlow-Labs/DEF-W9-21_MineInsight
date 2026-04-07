@@ -142,6 +142,11 @@ class MineInsightDataset(Dataset):
         self.samples: list[tuple[str, str]] = []
         self._build_index(sequences)
 
+        # For multi-modal: build nearest-timestamp index for secondary modalities
+        self._cross_modal_map: dict[str, dict[str, str]] = {}
+        if len(self.modalities) > 1:
+            self._build_cross_modal_index(sequences)
+
     def _parse_modalities(self, modality: str) -> list[str]:
         """Parse modality string into list of modality names."""
         if "+" in modality:
@@ -194,6 +199,67 @@ class MineInsightDataset(Dataset):
                 if img_file.suffix.lower() in (".jpg", ".jpeg", ".png", ".bmp", ".tif"):
                     self.samples.append((seq, img_file.stem))
 
+    @staticmethod
+    def _extract_timestamp(stem: str) -> int:
+        """Extract numeric timestamp from filename stem.
+
+        Stems look like: track_1_s1_rgb_1730290670_166206123
+        We combine the last two numeric parts as a single timestamp.
+        """
+        parts = stem.split("_")
+        # Find the last two numeric parts
+        nums = [p for p in parts if p.isdigit()]
+        if len(nums) >= 2:
+            return int(nums[-2]) * 1_000_000_000 + int(nums[-1])
+        if len(nums) >= 1:
+            return int(nums[-1])
+        return 0
+
+    def _build_cross_modal_index(self, sequences: list[str]) -> None:
+        """Build nearest-timestamp mapping from primary to secondary modalities.
+
+        RGB runs at ~10Hz, LWIR at ~30Hz — timestamps don't match exactly.
+        For each primary frame, find the closest secondary frame by timestamp.
+        """
+        import bisect
+
+        for mod in self.modalities:
+            if mod == self.primary:
+                continue
+            self._cross_modal_map[mod] = {}
+            for seq in sequences:
+                img_dir = self._find_img_dir(mod, seq)
+                if img_dir is None:
+                    continue
+                # Build sorted timestamp → stem index for this modality
+                mod_stems = []
+                for f in sorted(img_dir.iterdir()):
+                    if f.suffix.lower() in (".jpg", ".jpeg", ".png", ".bmp", ".tif"):
+                        ts = self._extract_timestamp(f.stem)
+                        mod_stems.append((ts, f.stem))
+                if not mod_stems:
+                    continue
+                mod_timestamps = [t[0] for t in mod_stems]
+
+                # For each primary sample in this sequence, find nearest
+                for prim_seq, prim_stem in self.samples:
+                    if prim_seq != seq:
+                        continue
+                    prim_ts = self._extract_timestamp(prim_stem)
+                    idx = bisect.bisect_left(mod_timestamps, prim_ts)
+                    # Check idx and idx-1 for closest
+                    best_stem = None
+                    best_dist = float("inf")
+                    for ci in (idx - 1, idx):
+                        if 0 <= ci < len(mod_timestamps):
+                            dist = abs(mod_timestamps[ci] - prim_ts)
+                            if dist < best_dist:
+                                best_dist = dist
+                                best_stem = mod_stems[ci][1]
+                    if best_stem is not None:
+                        key = f"{seq}/{prim_stem}"
+                        self._cross_modal_map[mod][key] = best_stem
+
     def __len__(self) -> int:
         return len(self.samples)
 
@@ -201,9 +267,15 @@ class MineInsightDataset(Dataset):
         """Load an image for a given modality, sequence, and file stem."""
         img_dir = self._find_img_dir(modality, seq)
         if img_dir is not None:
-            # The stem may have the primary modality prefix; try modality-specific stem
-            mod_stem = stem.replace(f"_{self.primary}_", f"_{modality}_")
-            for candidate_stem in (stem, mod_stem):
+            # For cross-modal: use nearest-timestamp matched stem
+            cross_key = f"{seq}/{stem}"
+            if modality in self._cross_modal_map and cross_key in self._cross_modal_map[modality]:
+                matched_stem = self._cross_modal_map[modality][cross_key]
+                candidates = [matched_stem]
+            else:
+                mod_stem = stem.replace(f"_{self.primary}_", f"_{modality}_")
+                candidates = [stem, mod_stem]
+            for candidate_stem in candidates:
                 for ext in (".jpg", ".jpeg", ".png", ".bmp", ".tif"):
                     path = img_dir / f"{candidate_stem}{ext}"
                     if path.exists():
