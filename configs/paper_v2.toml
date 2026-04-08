@@ -8,8 +8,8 @@ backbone = "cspdarknet_nano"
 num_classes = 58
 input_size = [640, 640]
 # Modalities: "rgb", "lwir", "swir", "rgb+lwir", "rgb+lwir+swir"
-modality = "lwir"
-pretrained = "/mnt/artifacts-datai/checkpoints/project_mineinsight_coco_pretrain/coco_pretrained.pth"  # Custom CSPDarknet-nano backbone, trained from scratch
+modality = "rgb"
+pretrained = "/mnt/artifacts-datai/checkpoints/project_mineinsight_coco_pretrain/coco_pretrained.pth"
 
 [model.fusion]
 enabled = false
@@ -49,16 +49,16 @@ flip_ud = 0.0
 scale = [0.5, 1.5]
 
 [loss]
-box_weight = 5.0
-cls_weight = 2.0
-# obj_weight removed — no objectness head
+box_weight = 7.5
+cls_weight = 0.5
+obj_weight = 1.0
 box_loss = "ciou"
 cls_loss = "focal"
 focal_alpha = 0.25
 focal_gamma = 2.0
 
 [checkpoint]
-output_dir = "/mnt/artifacts-datai/checkpoints/project_mineinsight_lwir"
+output_dir = "/mnt/artifacts-datai/checkpoints/project_mineinsight_rgb_v2"
 save_every_n_steps = 500
 keep_top_k = 2
 metric = "val_loss"
@@ -70,5 +70,5 @@ patience = 20
 min_delta = 0.001
 
 [logging]
-log_dir = "/mnt/artifacts-datai/logs/project_mineinsight_lwir"
-tensorboard_dir = "/mnt/artifacts-datai/tensorboard/project_mineinsight_lwir"
+log_dir = "/mnt/artifacts-datai/logs/project_mineinsight_rgb_v2"
+tensorboard_dir = "/mnt/artifacts-datai/tensorboard/project_mineinsight_rgb_v2"

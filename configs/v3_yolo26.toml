@@ -1,14 +1,13 @@
-# MineInsight v3 RGB — MONSTER config
-# COCO-pretrained backbone + ALL available sequences
-# Lower LR for fine-tuning, stronger augmentation
+# MineInsight v3 YOLO26n — latest architecture baseline
+# Ultralytics YOLO26n (Jan 2026, 2.6M params) on all RGB data
 
 [model]
-architecture = "yolov8"
-backbone = "cspdarknet_nano"
+architecture = "yolo26"
+backbone = "yolo26n"
 num_classes = 58
 input_size = [640, 640]
 modality = "rgb"
-pretrained = "/mnt/artifacts-datai/checkpoints/project_mineinsight_coco_pretrain/coco_pretrained.pth"
+pretrained = "/mnt/forge-data/models/yolo26n.pt"
 
 [model.fusion]
 enabled = false
@@ -30,7 +29,6 @@ seed = 42
 
 [data]
 dataset_root = "/mnt/train-data/datasets/mineinsight"
-# Train on 3 sequences (T1S1 + T1S2 + T2S1), test on T2S2 when available
 train_sequences = ["track_1_s1", "track_1_s2", "track_2_s1"]
 val_sequences = ["track_2_s1"]
 test_sequences = ["track_2_s1"]
@@ -57,7 +55,7 @@ focal_alpha = 0.25
 focal_gamma = 2.0
 
 [checkpoint]
-output_dir = "/mnt/artifacts-datai/checkpoints/project_mineinsight_v3_rgb"
+output_dir = "/mnt/artifacts-datai/checkpoints/project_mineinsight_v3_yolo26"
 save_every_n_steps = 500
 keep_top_k = 2
 metric = "val_loss"
@@ -69,5 +67,5 @@ patience = 25
 min_delta = 0.001
 
 [logging]
-log_dir = "/mnt/artifacts-datai/logs/project_mineinsight_v3_rgb"
-tensorboard_dir = "/mnt/artifacts-datai/tensorboard/project_mineinsight_v3_rgb"
+log_dir = "/mnt/artifacts-datai/logs/project_mineinsight_v3_yolo26"
+tensorboard_dir = "/mnt/artifacts-datai/tensorboard/project_mineinsight_v3_yolo26"

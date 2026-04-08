@@ -32,7 +32,7 @@ dataset_root = "/mnt/train-data/datasets/mineinsight"
 train_sequences = ["track_1_s1", "track_2_s1"]
 val_sequences = ["track_2_s1"]
 test_sequences = ["track_2_s1"]
-num_workers = 8
+num_workers = 4
 pin_memory = true
 
 [data.augmentation]
@@ -46,9 +46,9 @@ flip_ud = 0.0
 scale = [0.3, 1.7]
 
 [loss]
-box_weight = 7.5
-cls_weight = 0.5
-obj_weight = 1.5
+box_weight = 5.0
+cls_weight = 2.0
+# obj_weight removed — no objectness head
 box_loss = "ciou"
 cls_loss = "focal"
 focal_alpha = 0.25
