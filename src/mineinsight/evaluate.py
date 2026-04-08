@@ -55,17 +55,17 @@ def decode_predictions(
     }
 
     for b in range(batch_size):
-        pred = all_preds[b]  # (A, 5+C)
+        pred = all_preds[b]  # (A, 4+C+1)
 
         box_cxcywh = pred[:, :4]
-        obj_logit = pred[:, 4]
-        cls_logit = pred[:, 5:]
+        cls_logit = pred[:, 4:]  # (A, num_classes+1) — class 0 is background
 
-        obj_conf = torch.sigmoid(obj_logit)
         cls_conf = torch.sigmoid(cls_logit)
 
-        scores, labels = cls_conf.max(dim=-1)
-        scores = scores * obj_conf
+        # Skip background class (index 0) — detection score = max non-background class
+        fg_conf = cls_conf[:, 1:]  # (A, num_classes)
+        scores, labels = fg_conf.max(dim=-1)
+        labels = labels + 1  # offset back to 1-indexed class IDs
 
         mask = scores > conf_threshold
         if mask.sum() == 0:

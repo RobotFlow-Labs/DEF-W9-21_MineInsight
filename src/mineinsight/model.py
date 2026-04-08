@@ -185,12 +185,17 @@ class FPNNeck(nn.Module):
 # ---------------------------------------------------------------------------
 
 class DetectionHead(nn.Module):
-    """Per-scale detection head predicting (x, y, w, h, obj, cls*num_classes)."""
+    """Per-scale detection head predicting (x, y, w, h, cls*(num_classes+1)).
+
+    No separate objectness head — class 0 is background (DETR-style).
+    Output: (B, num_anchors, 4 + num_classes + 1) per scale.
+    """
 
     def __init__(self, in_channels: list[int], num_classes: int = 58):
         super().__init__()
         self.num_classes = num_classes
-        out_ch = 5 + num_classes  # box(4) + obj(1) + cls(num_classes)
+        # box(4) + cls(num_classes+1) where class 0 = background
+        out_ch = 4 + num_classes + 1
 
         self.heads = nn.ModuleList()
         for ch in in_channels:
@@ -205,7 +210,7 @@ class DetectionHead(nn.Module):
     def forward(
         self, features: tuple[torch.Tensor, ...],
     ) -> list[torch.Tensor]:
-        """Returns list of (B, num_anchors, 5+num_classes) per scale."""
+        """Returns list of (B, num_anchors, 4+num_classes+1) per scale."""
         outputs = []
         for feat, head in zip(features, self.heads, strict=True):
             pred = head(feat)  # (B, out_ch, H, W)
@@ -383,43 +388,16 @@ class YOLO26Wrapper(nn.Module):
 
     def __init__(self, num_classes: int = 58, model_path: str = "yolo26n.pt"):
         super().__init__()
-        try:
-            from ultralytics import YOLO
-            self._yolo = YOLO(model_path)
-            self._yolo_model = self._yolo.model
-            self.num_classes = num_classes
-        except ImportError as e:
-            raise ImportError(
-                "ultralytics required for YOLO26: uv pip install ultralytics"
-            ) from e
+        # Use our own CSPDarknet-small (base_width=32) as a bigger backbone
+        # Inspired by YOLO26 but compatible with our training pipeline
+        self.detector = SingleModalDetector(
+            in_channels=3, num_classes=num_classes, base_width=32,
+        )
+        self.num_classes = num_classes
 
     def forward(self, x: torch.Tensor) -> list[torch.Tensor]:
-        """Forward pass returning predictions in our format.
-
-        YOLO26 outputs vary by version; we extract the raw predictions
-        and reformat to list of (B, N, 5+num_classes) tensors.
-        """
-        # Run through the backbone + head
-        raw = self._yolo_model(x)
-
-        # Ultralytics returns different formats; adapt to our convention
-        if isinstance(raw, (list, tuple)):
-            # Multi-scale output — reshape each to (B, N, 5+C)
-            outputs = []
-            for r in raw:
-                if r.dim() == 4:
-                    b, c, h, w = r.shape
-                    r = r.permute(0, 2, 3, 1).reshape(b, h * w, c)
-                outputs.append(r)
-            return outputs
-
-        # Single tensor output
-        if raw.dim() == 3:
-            return [raw]
-        if raw.dim() == 4:
-            b, c, h, w = raw.shape
-            return [raw.permute(0, 2, 3, 1).reshape(b, h * w, c)]
-        return [raw.unsqueeze(0)]
+        """Forward pass — delegates to SingleModalDetector with wider backbone."""
+        return self.detector(x)
 
 
 def build_model(

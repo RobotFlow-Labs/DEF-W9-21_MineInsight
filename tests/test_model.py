@@ -56,7 +56,7 @@ class TestDetectionHead:
         outputs = head(feats)
         assert len(outputs) == 3
         # P3: 80*80 = 6400 anchors, P4: 40*40=1600, P5: 20*20=400
-        assert outputs[0].shape == (2, 6400, 40)  # 5 + 35
+        assert outputs[0].shape == (2, 6400, 40)  # 4 + 35 + 1 (background)
         assert outputs[1].shape == (2, 1600, 40)
         assert outputs[2].shape == (2, 400, 40)
 
@@ -152,13 +152,14 @@ class TestFocalLoss:
 class TestDetectionLoss:
     def test_forward(self):
         criterion = DetectionLoss(num_classes=35)
+        # Output: 4 + 35 + 1 (background) = 40 channels
         predictions = [
             torch.randn(2, 100, 40, requires_grad=True),
             torch.randn(2, 25, 40, requires_grad=True),
         ]
         targets = torch.zeros(2, 3, 5)
-        targets[0, 0] = torch.tensor([0, 320, 320, 50, 50])
-        targets[0, 1] = torch.tensor([1, 100, 100, 30, 30])
+        targets[0, 0] = torch.tensor([1, 320, 320, 50, 50])  # class 1 (1-indexed)
+        targets[0, 1] = torch.tensor([2, 100, 100, 30, 30])
         targets[1, 0] = torch.tensor([5, 200, 200, 40, 40])
         target_counts = torch.tensor([2, 1])
 
@@ -166,7 +167,6 @@ class TestDetectionLoss:
         assert "loss" in loss_dict
         assert "box_loss" in loss_dict
         assert "cls_loss" in loss_dict
-        assert "obj_loss" in loss_dict
         assert loss_dict["loss"].requires_grad
 
 

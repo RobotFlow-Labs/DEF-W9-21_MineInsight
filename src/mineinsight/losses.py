@@ -156,13 +156,16 @@ class FocalLoss(nn.Module):
 
 
 class DetectionLoss(nn.Module):
-    """Combined detection loss: box regression + classification + objectness.
+    """DETR-style detection loss with Hungarian matching.
+
+    No separate objectness head — class 0 is background.
+    Hungarian matcher provides optimal 1:1 assignment between predictions and GT.
+    All anchors get classification signal (matched→target class, unmatched→background).
 
     Args:
-        num_classes: Number of object classes.
+        num_classes: Number of object classes (not including background).
         box_weight: Weight for CIoU box loss.
         cls_weight: Weight for focal classification loss.
-        obj_weight: Weight for BCE objectness loss.
         focal_alpha: Focal loss alpha.
         focal_gamma: Focal loss gamma.
     """
@@ -170,20 +173,24 @@ class DetectionLoss(nn.Module):
     def __init__(
         self,
         num_classes: int = 58,
-        box_weight: float = 7.5,
-        cls_weight: float = 0.5,
-        obj_weight: float = 1.0,
+        box_weight: float = 5.0,
+        cls_weight: float = 2.0,
         focal_alpha: float = 0.25,
         focal_gamma: float = 2.0,
+        **kwargs,
     ):
         super().__init__()
         self.num_classes = num_classes
         self.box_weight = box_weight
         self.cls_weight = cls_weight
-        self.obj_weight = obj_weight
 
+        from mineinsight.matcher import HungarianMatcher
+
+        self.matcher = HungarianMatcher(
+            cost_class=2.0, cost_bbox=5.0, cost_giou=2.0,
+            focal_alpha=focal_alpha, focal_gamma=focal_gamma,
+        )
         self.focal = FocalLoss(alpha=focal_alpha, gamma=focal_gamma)
-        self.bce = nn.BCEWithLogitsLoss(reduction="mean")
 
     def forward(
         self,
@@ -191,100 +198,71 @@ class DetectionLoss(nn.Module):
         targets: torch.Tensor,
         target_counts: torch.Tensor,
     ) -> dict[str, torch.Tensor]:
-        """Compute combined detection loss.
+        """Compute detection loss with Hungarian matching.
 
         Args:
-            predictions: List of (B, N_i, 5+num_classes) per scale.
+            predictions: List of (B, N_i, 4+num_classes+1) per scale.
             targets: (B, max_targets, 5) with [cls_id, cx, cy, w, h] in pixels.
             target_counts: (B,) number of valid targets per sample.
 
         Returns:
-            Dict with "loss", "box_loss", "cls_loss", "obj_loss".
+            Dict with "loss", "box_loss", "cls_loss".
         """
         device = predictions[0].device
         batch_size = predictions[0].shape[0]
 
         total_box = torch.tensor(0.0, device=device)
         total_cls = torch.tensor(0.0, device=device)
-        total_obj = torch.tensor(0.0, device=device)
-        num_pos = 0
+        num_matches = 0
 
-        # Concatenate all scale predictions
-        all_preds = torch.cat(predictions, dim=1)  # (B, total_anchors, 5+C)
+        all_preds = torch.cat(predictions, dim=1)  # (B, A, 4+C+1)
 
         for b in range(batch_size):
             n_targets = target_counts[b].item()
-            pred = all_preds[b]  # (total_anchors, 5+C)
+            pred = all_preds[b]  # (A, 4+C+1)
 
-            pred_box = pred[:, :4]   # (A, 4) cx, cy, w, h
-            pred_obj = pred[:, 4]    # (A,) objectness logit
-            pred_cls = pred[:, 5:]   # (A, C) class logits
+            pred_box = pred[:, :4]                    # (A, 4)
+            pred_cls = pred[:, 4:]                    # (A, num_classes+1)
+            n_anchors = pred_box.shape[0]
 
-            if n_targets == 0:
-                # No targets: all predictions should have low objectness
-                obj_target = torch.zeros_like(pred_obj)
-                total_obj = total_obj + self.bce(pred_obj, obj_target)
-                continue
+            gt = targets[b, :max(n_targets, 1)]
+            gt_cls = gt[:, 0].long()
+            gt_box = gt[:, 1:5]
 
-            gt = targets[b, :n_targets]  # (T, 5)
-            gt_cls = gt[:, 0].long()     # (T,)
-            gt_box = gt[:, 1:5]          # (T, 4) cx, cy, w, h
+            # Hungarian matching
+            pred_idx, gt_idx = self.matcher(
+                pred_box.detach(), pred_cls.detach(),
+                gt_box, gt_cls, n_targets,
+            )
 
-            # Simple assignment: match each prediction to closest target by center distance
-            pred_centers = pred_box[:, :2]    # (A, 2)
-            gt_centers = gt_box[:, :2]        # (T, 2)
-            dist = torch.cdist(pred_centers, gt_centers)  # (A, T)
-            min_dist, assigned_gt = dist.min(dim=1)       # (A,)
+            n_matched = len(pred_idx)
 
-            # Positive mask: predictions within a radius of any target center
-            # Use a dynamic radius based on target size
-            gt_sizes = (gt_box[:, 2] + gt_box[:, 3]) / 2  # mean of w, h
-            assigned_radius = gt_sizes[assigned_gt] * 0.5
-            pos_mask = min_dist < assigned_radius
+            # Classification: ALL anchors get a target
+            # Matched anchors → target class, unmatched → background (0)
+            cls_target = torch.zeros(n_anchors, dtype=torch.long, device=device)
+            if n_matched > 0:
+                # GT class IDs are used as-is (1-indexed in dataset)
+                cls_target[pred_idx] = gt_cls[gt_idx]
+                num_matches += n_matched
 
-            num_pos_this = pos_mask.sum().item()
-            if num_pos_this == 0:
-                # Fallback: take top-K closest per target
-                k = min(3, pred_box.shape[0])
-                _, topk_idx = dist.topk(k, dim=0, largest=False)
-                pos_mask_flat = torch.zeros(pred_box.shape[0], dtype=torch.bool, device=device)
-                pos_mask_flat[topk_idx.flatten()] = True
-                pos_mask = pos_mask_flat
-                num_pos_this = pos_mask.sum().item()
+            total_cls = total_cls + self.focal(pred_cls, cls_target)
 
-            if num_pos_this > 0:
-                num_pos += num_pos_this
+            # Box loss: only matched predictions
+            if n_matched > 0:
+                matched_pred_box = pred_box[pred_idx]
+                matched_gt_box = gt_box[gt_idx]
+                total_box = total_box + ciou_loss(matched_pred_box, matched_gt_box)
 
-                # Box loss (positive predictions only)
-                pos_pred_box = pred_box[pos_mask]
-                pos_gt_idx = assigned_gt[pos_mask]
-                pos_gt_box = gt_box[pos_gt_idx]
-                total_box = total_box + ciou_loss(pos_pred_box, pos_gt_box)
-
-                # Classification loss (positive predictions only)
-                pos_pred_cls = pred_cls[pos_mask]
-                pos_gt_cls = gt_cls[pos_gt_idx]
-                total_cls = total_cls + self.focal(pos_pred_cls, pos_gt_cls)
-
-            # Objectness loss (all predictions)
-            obj_target = pos_mask.float()
-            total_obj = total_obj + self.bce(pred_obj, obj_target)
-
-        # Normalize
-        num_pos = max(num_pos, 1)
-        box_loss = total_box / batch_size
+        # Normalize by number of matches (not batch_size)
+        num_matches = max(num_matches, 1)
+        box_loss = total_box / num_matches
         cls_loss = total_cls / batch_size
-        obj_loss = total_obj / batch_size
 
-        total_loss = (
-            self.box_weight * box_loss
-            + self.cls_weight * cls_loss
-            + self.obj_weight * obj_loss
-        )
+        total_loss = self.box_weight * box_loss + self.cls_weight * cls_loss
 
         return {
             "loss": total_loss,
             "box_loss": box_loss.detach(),
             "cls_loss": cls_loss.detach(),
-            "obj_loss": obj_loss.detach(),
+            "obj_loss": torch.tensor(0.0, device=device),  # compat placeholder
         }
