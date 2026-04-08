@@ -281,15 +281,38 @@ def train_fusion(
                 val_batches += 1
 
         avg_val = val_loss / max(val_batches, 1)
-        elapsed = time.time() - t0
 
+        # Detection health check every 5 epochs
+        max_fg = 0.0
+        if (epoch + 1) % 5 == 0 or epoch == 0:
+            model.eval()
+            step = max(1, len(val_ds) // 50)
+            for i in range(0, min(len(val_ds), 50 * step), step):
+                sample = val_ds[i]
+                if "images" in sample:
+                    inp = {m: t.unsqueeze(0).to(device) for m, t in sample["images"].items()}
+                else:
+                    inp = sample["image"].unsqueeze(0).to(device)
+                with torch.no_grad():
+                    p = model(inp)
+                fg = torch.sigmoid(torch.cat(p, dim=1)[0, :, 5:]).max().item()
+                if fg > max_fg:
+                    max_fg = fg
+
+        elapsed = time.time() - t0
+        fg_str = f" max_fg={max_fg:.4f}" if max_fg > 0 else ""
         print(
             f"[Epoch {epoch + 1}/{cfg.training.epochs}] "
-            f"train_loss={avg_train:.4f} val_loss={avg_val:.4f} time={elapsed:.1f}s",
+            f"train_loss={avg_train:.4f} val_loss={avg_val:.4f}"
+            f"{fg_str} time={elapsed:.1f}s",
         )
+        if max_fg > 0 and max_fg < 0.10:
+            print(f"  [WARN] Model not detecting — max_fg={max_fg:.4f}")
 
         if writer:
             writer.add_scalar("val/loss", avg_val, global_step)
+            if max_fg > 0:
+                writer.add_scalar("val/max_fg", max_fg, global_step)
 
         state = {
             "model": model.state_dict(),

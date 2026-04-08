@@ -160,6 +160,36 @@ def train_one_epoch(
 
 
 @torch.no_grad()
+def detection_health_check(
+    model: torch.nn.Module,
+    dataset,
+    device: torch.device,
+    n_samples: int = 50,
+) -> float:
+    """Quick check: are foreground scores high enough to detect objects?
+
+    Returns max foreground score across sampled images.
+    If < 0.10, the model is not detecting anything useful.
+    """
+    model.eval()
+    max_fg = 0.0
+    step = max(1, len(dataset) // n_samples)
+    for i in range(0, min(len(dataset), n_samples * step), step):
+        sample = dataset[i]
+        if "images" in sample:
+            inp = {mod: t.unsqueeze(0).to(device) for mod, t in sample["images"].items()}
+        else:
+            inp = sample["image"].unsqueeze(0).to(device)
+        preds = model(inp)
+        all_p = torch.cat(preds, dim=1)[0]
+        cls_logits = all_p[:, 4:]
+        fg = torch.sigmoid(cls_logits[:, 1:]).max().item()
+        if fg > max_fg:
+            max_fg = fg
+    return max_fg
+
+
+@torch.no_grad()
 def validate(
     model: torch.nn.Module,
     loader: DataLoader,
@@ -344,16 +374,28 @@ def train(cfg: Config, resume: str | None = None, max_steps: int | None = None) 
         val_loss = val_metrics["val_loss"]
         val_map = val_metrics.get("val_mAP50", 0.0)
 
+        # Detection health check every 5 epochs
+        max_fg = 0.0
+        if (epoch + 1) % 5 == 0 or epoch == 0:
+            max_fg = detection_health_check(model, val_loader.dataset, device, 50)
+
         elapsed = time.time() - t0
+        fg_str = f" max_fg={max_fg:.4f}" if max_fg > 0 else ""
         print(
             f"[Epoch {epoch + 1}/{cfg.training.epochs}] "
-            f"train_loss={avg_train_loss:.4f} val_loss={val_loss:.4f} "
-            f"val_mAP50={val_map:.4f} time={elapsed:.1f}s",
+            f"train_loss={avg_train_loss:.4f} val_loss={val_loss:.4f}"
+            f"{fg_str} time={elapsed:.1f}s",
         )
+        if max_fg > 0 and max_fg < 0.10:
+            print(
+                f"  [WARN] Model not detecting — max_fg={max_fg:.4f}. "
+                f"Check loss balance.",
+            )
 
         if writer is not None:
             writer.add_scalar("val/loss", val_loss, global_step)
-            writer.add_scalar("val/mAP50", val_map, global_step)
+            if max_fg > 0:
+                writer.add_scalar("val/max_fg", max_fg, global_step)
 
         # Save checkpoint
         metric_val = val_map if cfg.checkpoint.mode == "max" else val_loss

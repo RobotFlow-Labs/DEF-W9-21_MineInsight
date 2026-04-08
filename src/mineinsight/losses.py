@@ -177,12 +177,14 @@ class DetectionLoss(nn.Module):
         cls_weight: float = 2.0,
         focal_alpha: float = 0.25,
         focal_gamma: float = 2.0,
+        neg_ratio: int = 3,
         **kwargs,
     ):
         super().__init__()
         self.num_classes = num_classes
         self.box_weight = box_weight
         self.cls_weight = cls_weight
+        self.neg_ratio = neg_ratio
 
         from mineinsight.matcher import HungarianMatcher
 
@@ -237,15 +239,33 @@ class DetectionLoss(nn.Module):
 
             n_matched = len(pred_idx)
 
-            # Classification: ALL anchors get a target
-            # Matched anchors → target class, unmatched → background (0)
+            # Classification with hard negative mining
+            # Only compute loss on matched + hard negatives (not all 33K anchors)
             cls_target = torch.zeros(n_anchors, dtype=torch.long, device=device)
             if n_matched > 0:
-                # GT class IDs are used as-is (1-indexed in dataset)
                 cls_target[pred_idx] = gt_cls[gt_idx]
                 num_matches += n_matched
 
-            total_cls = total_cls + self.focal(pred_cls, cls_target)
+            # Select hard negatives: unmatched anchors with highest FG score
+            n_neg = min(
+                self.neg_ratio * max(n_matched, 1),
+                n_anchors - n_matched,
+            )
+            with torch.no_grad():
+                fg_scores = pred_cls[:, 1:].sigmoid().max(dim=-1).values
+                if n_matched > 0:
+                    fg_scores[pred_idx] = -1.0  # exclude matched
+                _, hard_neg_idx = fg_scores.topk(n_neg)
+
+            # Combine matched + hard negatives for focal loss
+            if n_matched > 0:
+                sample_idx = torch.cat([pred_idx, hard_neg_idx])
+            else:
+                sample_idx = hard_neg_idx
+
+            total_cls = total_cls + self.focal(
+                pred_cls[sample_idx], cls_target[sample_idx],
+            )
 
             # Box loss: only matched predictions
             if n_matched > 0:
