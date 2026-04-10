@@ -1,5 +1,23 @@
 """Hungarian bipartite matcher for DETR-style detection.
 
+.. warning::
+
+    **ARCHIVED** — this module belongs to the legacy custom CSPDarknet +
+    Hungarian + focal-loss training pipeline that was superseded by stock
+    Ultralytics YOLO26s + TAL assigner in April 2026 (see ``PIVOT_PLAN.md``).
+    YOLO26's TaskAlignedAssigner is a pure-torch GPU operation and does NOT
+    suffer from the CPU sync penalty of the scipy call below. **Do not use
+    this matcher for new training runs** — use ``scripts/train_yolo26_fusion.py``.
+
+Performance caveat for the legacy path:
+    This matcher calls ``scipy.optimize.linear_sum_assignment`` on every
+    forward pass, which requires a GPU→CPU sync of the cost matrix and
+    releases the Python GIL. There is no direct cupy equivalent
+    (``cupyx.scipy`` does not ship Hungarian). A GPU replacement would
+    require a custom ``auction-lap`` / ``lapjv`` kernel or porting
+    Ultralytics' ``TaskAlignedAssigner`` — which is already what we use in
+    the production pipeline.
+
 Matches predicted anchors to ground truth targets using optimal assignment
 via scipy.optimize.linear_sum_assignment. Cost matrix combines classification,
 L1 bbox, and GIoU costs.

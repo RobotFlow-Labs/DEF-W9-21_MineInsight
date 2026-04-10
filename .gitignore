@@ -1,11 +1,44 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
 .venv/
 build/
 dist/
-*.egg-info/
 *.so
 *.o
 .ruff_cache/
 .pytest_cache/
+
+# Model weights & checkpoints (should live in /mnt/artifacts-datai)
+*.pt
+*.pth
+*.safetensors
+*.onnx
+*.engine
+*.trt
+
+# Images / sensor data / datasets (live in /mnt/train-data/datasets)
+*.tiff
+*.tif
+*.zip
+*.tar
+*.tar.gz
+track_*/
+data_split.json
+
+# Ultralytics artifacts (training dumps)
+runs/
+*.csv
+yolo*.pt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -380,24 +380,36 @@ class MultiModalDetector(nn.Module):
 # Factory
 # ---------------------------------------------------------------------------
 
-class YOLO26Wrapper(nn.Module):
-    """Wrapper around Ultralytics YOLO26 for use in our pipeline.
+class CSPDarknetWideWrapper(nn.Module):
+    """Wider CSPDarknet variant (base_width=32) for the legacy custom model.
 
-    Adapts YOLO26 output format to match our (B, N, 5+C) per-scale format.
+    **This is NOT Ultralytics YOLO26.** It was previously misnamed
+    ``YOLO26Wrapper`` and accepted a ``model_path`` argument that was silently
+    ignored — the name promised Ultralytics YOLO26 weights but the code only
+    built a wider CSPDarknet with random init. Any historical run labelled
+    "yolo26 baseline" was actually this wide CSPDarknet.
+
+    For the **real** stock Ultralytics YOLO26s path, use
+    ``scripts/train_yolo26_fusion.py`` which loads
+    ``/mnt/train-data/models/yolo26/yolo26s.pt`` directly via the Ultralytics
+    library. This class is kept purely for backward-compatible deserialization
+    of older checkpoints.
     """
 
-    def __init__(self, num_classes: int = 58, model_path: str = "yolo26n.pt"):
+    def __init__(self, num_classes: int = 58, *_, **__):
         super().__init__()
-        # Use our own CSPDarknet-small (base_width=32) as a bigger backbone
-        # Inspired by YOLO26 but compatible with our training pipeline
         self.detector = SingleModalDetector(
             in_channels=3, num_classes=num_classes, base_width=32,
         )
         self.num_classes = num_classes
 
     def forward(self, x: torch.Tensor) -> list[torch.Tensor]:
-        """Forward pass — delegates to SingleModalDetector with wider backbone."""
         return self.detector(x)
+
+
+# Backward-compatibility alias so any existing checkpoints / imports don't
+# break at load time. New code should use CSPDarknetWideWrapper directly.
+YOLO26Wrapper = CSPDarknetWideWrapper
 
 
 def build_model(
@@ -406,7 +418,7 @@ def build_model(
     base_width: int = 16,
     fusion_method: str = "attention",
     architecture: str = "yolov8",
-    pretrained: str = "",
+    pretrained: str = "",  # noqa: ARG001 — kept for backward compat
 ) -> nn.Module:
     """Build a detector based on modality configuration.
 
@@ -415,15 +427,18 @@ def build_model(
         num_classes: Number of object classes.
         base_width: Base channel width (16 = nano).
         fusion_method: "attention", "concat", or "add".
-        architecture: "yolov8" (custom CSPDarknet) or "yolo26" (Ultralytics YOLO26).
-        pretrained: Path to pretrained weights (for YOLO26 wrapper).
+        architecture:
+            "yolov8" — custom CSPDarknet (default, legacy).
+            "cspdarknet_wide" / "yolo26" — wider CSPDarknet (legacy alias).
+        pretrained: DEPRECATED — silently ignored by legacy wrappers. Use
+            ``scripts/train_yolo26_fusion.py`` if you need real Ultralytics
+            weight loading.
 
     Returns:
         Detection model.
     """
-    if architecture == "yolo26":
-        model_path = pretrained if pretrained else "yolo26n.pt"
-        return YOLO26Wrapper(num_classes=num_classes, model_path=model_path)
+    if architecture in ("yolo26", "cspdarknet_wide"):
+        return CSPDarknetWideWrapper(num_classes=num_classes)
     if "+" in modality:
         mods = modality.split("+")
         return MultiModalDetector(mods, num_classes, base_width, fusion_method)

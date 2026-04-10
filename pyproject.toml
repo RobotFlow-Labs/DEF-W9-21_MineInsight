@@ -23,6 +23,9 @@ dependencies = [
   "fastapi>=0.111",
   "uvicorn>=0.30",
   "python-multipart>=0.0.9",
+  # Pivot: stock Ultralytics YOLO26 + multi-page TIFF dataset pipeline
+  "ultralytics>=8.4",
+  "tifffile>=2024.2",
 ]
 
 [project.optional-dependencies]

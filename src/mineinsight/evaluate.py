@@ -264,9 +264,12 @@ def evaluate(
         augment=False,
     )
 
+    # Use the config's batch_size (previously hardcoded to 8, which OOMs on
+    # multi-modal 1280² inputs). Fall back to 8 if config is "auto".
+    eval_bs = cfg.training.batch_size if isinstance(cfg.training.batch_size, int) else 8
     loader = DataLoader(
         dataset,
-        batch_size=8,
+        batch_size=eval_bs,
         shuffle=False,
         num_workers=cfg.data.num_workers,
         collate_fn=collate_fn,
@@ -285,18 +288,25 @@ def evaluate(
     amp_dtype = torch.bfloat16 if precision_type == "bf16" else torch.float16
 
     for batch in loader:
-        images = batch["image"].to(device)
         targets = batch["targets"]
         target_counts = batch["target_counts"]
+
+        # Multi-modal fusion: pass dict; single-modal: pass tensor
+        if "images" in batch:
+            model_input = {mod: t.to(device) for mod, t in batch["images"].items()}
+            batch_n = next(iter(model_input.values())).shape[0]
+        else:
+            model_input = batch["image"].to(device)
+            batch_n = model_input.shape[0]
 
         t0 = time.time()
         if use_amp:
             with torch.amp.autocast("cuda", dtype=amp_dtype):
-                preds = model(images)
+                preds = model(model_input)
         else:
-            preds = model(images)
+            preds = model(model_input)
         total_time += time.time() - t0
-        num_images += images.shape[0]
+        num_images += batch_n
 
         dets = decode_predictions(preds, conf_threshold=conf_threshold)
         all_detections.extend(dets)

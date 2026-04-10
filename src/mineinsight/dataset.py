@@ -276,12 +276,26 @@ class MineInsightDataset(Dataset):
                 mod_stem = stem.replace(f"_{self.primary}_", f"_{modality}_")
                 candidates = [stem, mod_stem]
             for candidate_stem in candidates:
-                for ext in (".jpg", ".jpeg", ".png", ".bmp", ".tif"):
+                for ext in (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"):
                     path = img_dir / f"{candidate_stem}{ext}"
                     if path.exists():
-                        img = cv2.imread(str(path))
-                        if img is not None:
-                            return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                        # IMREAD_UNCHANGED preserves 16-bit TIFFs (FLIR Boson
+                        # LWIR output). Plain cv2.imread silently returns None
+                        # for 16-bit, which was feeding the model blank frames.
+                        img = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+                        if img is None:
+                            continue
+                        # uint16 → uint8 (normalize via shift)
+                        if img.dtype == np.uint16:
+                            img = (img >> 8).astype(np.uint8)
+                        # Mono → 3-channel
+                        if img.ndim == 2:
+                            img = np.stack([img] * 3, axis=-1)
+                        elif img.shape[-1] == 4:
+                            img = img[..., :3]
+                        elif img.shape[-1] == 3:
+                            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                        return img
         import warnings
 
         warnings.warn(
@@ -335,7 +349,11 @@ class MineInsightDataset(Dataset):
             img, sx, sy = self._resize(img)
 
             if self.augment:
-                img = self._augment_hsv(img)
+                # Skip HSV jitter for LWIR and SWIR: hue-shifting thermal /
+                # near-IR pseudocolor has no physical meaning and only adds
+                # noise to the fusion branch.
+                if mod == "rgb":
+                    img = self._augment_hsv(img)
                 if do_flip:
                     img = np.ascontiguousarray(img[:, ::-1])
 

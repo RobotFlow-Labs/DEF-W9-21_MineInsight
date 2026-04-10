@@ -87,7 +87,11 @@ def train_one_epoch(
     use_amp = precision in ("bf16", "fp16") and device.type == "cuda"
     amp_dtype = torch.bfloat16 if precision == "bf16" else torch.float16
 
-    is_multimodal = "images" in (loader.dataset[0] if len(loader.dataset) > 0 else {})
+    # Determine multi-modal status from dataset metadata (NOT by calling
+    # __getitem__(0), which triggers full disk I/O + augmentation at every
+    # epoch start). Rely on the .modalities attribute we set in __init__.
+    ds = loader.dataset
+    is_multimodal = hasattr(ds, "modalities") and len(ds.modalities) > 1
 
     for batch in loader:
         targets = batch["targets"].to(device)
@@ -206,7 +210,9 @@ def validate(
     use_amp = precision in ("bf16", "fp16") and device.type == "cuda"
     amp_dtype = torch.bfloat16 if precision == "bf16" else torch.float16
 
-    is_multimodal = "images" in (loader.dataset[0] if len(loader.dataset) > 0 else {})
+    # Cached multi-modal check (no disk I/O, see train_one_epoch)
+    ds = loader.dataset
+    is_multimodal = hasattr(ds, "modalities") and len(ds.modalities) > 1
 
     for batch in loader:
         targets = batch["targets"].to(device)

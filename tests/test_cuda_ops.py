@@ -1,6 +1,12 @@
-"""Tests for MineInsight CUDA-accelerated operations."""
+"""Tests for MineInsight CUDA-accelerated operations.
 
-import sys
+The tests in ``TestCustomCudaKernels`` require a compiled
+``mineinsight_cuda_ops`` extension (built from ``csrc/``). On any machine
+without the ``.so``, those tests are skipped via ``pytest.importorskip``
+rather than crashing with ``ImportError`` at class-scope time.
+"""
+
+from pathlib import Path
 
 import pytest
 import torch
@@ -9,6 +15,15 @@ import torch
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA not available"
 )
+
+# Make the in-repo src/ importable when running tests from a clean checkout.
+# Uses an ABSOLUTE path (the previous relative ``sys.path.insert(0, "src")``
+# was cwd-dependent and would break depending on where pytest was invoked).
+_REPO_SRC = Path(__file__).resolve().parent.parent / "src"
+import sys as _sys  # noqa: E402
+
+if str(_REPO_SRC) not in _sys.path:
+    _sys.path.insert(0, str(_REPO_SRC))
 
 
 class TestCudaOps:
@@ -77,40 +92,39 @@ class TestCudaOps:
 
 
 class TestCustomCudaKernels:
-    def test_fused_multimodal_preprocess(self):
-        sys.path.insert(0, "src")
-        import mineinsight_cuda_ops as ops
+    """Custom CUDA extension tests (skipped if the .so isn't built)."""
 
+    @staticmethod
+    def _ops():
+        # pytest.importorskip replaces the fragile class-level import that
+        # previously crashed the whole suite when the extension wasn't built.
+        return pytest.importorskip("mineinsight_cuda_ops")
+
+    def test_fused_multimodal_preprocess(self):
+        ops = self._ops()
         rgb = torch.randint(0, 255, (640, 640, 3), dtype=torch.uint8, device="cuda")
         thermal = torch.randint(0, 255, (640, 640, 3), dtype=torch.uint8, device="cuda")
         out = ops.fused_multimodal_preprocess(rgb, thermal)
         assert out.shape == (6, 640, 640)
         assert out.dtype == torch.float32
-        # First 3 channels from RGB, next 3 from thermal
         assert out.min() >= 0.0
         assert out.max() <= 1.0
 
     def test_fused_batch_multimodal_preprocess(self):
-        sys.path.insert(0, "src")
-        import mineinsight_cuda_ops as ops
-
+        ops = self._ops()
         rgb = torch.randint(0, 255, (4, 640, 640, 3), dtype=torch.uint8, device="cuda")
         thermal = torch.randint(0, 255, (4, 640, 640, 3), dtype=torch.uint8, device="cuda")
         out = ops.fused_batch_multimodal_preprocess(rgb, thermal)
         assert out.shape == (4, 6, 640, 640)
 
     def test_fused_ciou_loss(self):
-        sys.path.insert(0, "src")
-        import mineinsight_cuda_ops as ops
-
-        # Identical boxes → loss near 0
+        ops = self._ops()
         boxes = torch.tensor(
             [[100, 100, 50, 50]] * 10, dtype=torch.float32, device="cuda"
         )
         loss = ops.fused_ciou_loss(boxes, boxes)
         assert loss.item() < 0.01
 
-        # Different boxes → loss > 0
         pred = torch.tensor(
             [[100, 100, 50, 50]] * 10, dtype=torch.float32, device="cuda"
         )
@@ -121,9 +135,7 @@ class TestCustomCudaKernels:
         assert loss.item() > 0.5
 
     def test_fused_detection_decode(self):
-        sys.path.insert(0, "src")
-        import mineinsight_cuda_ops as ops
-
+        ops = self._ops()
         preds = torch.randn(1000, 40, device="cuda")  # 5 + 35 classes
         boxes, scores, labels = ops.fused_detection_decode(preds, 0.25)
         assert boxes.shape == (1000, 4)

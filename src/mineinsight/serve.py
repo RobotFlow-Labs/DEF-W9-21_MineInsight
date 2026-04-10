@@ -68,11 +68,15 @@ def _get_app() -> FastAPI:
 
     @app.get("/info")
     async def info():
+        # Read num_classes from the loaded model (previously hardcoded to 35,
+        # which disagreed with the 58 the model was built with, silently
+        # lying to any downstream consumer).
+        num_classes = getattr(_model, "num_classes", None) if _model is not None else None
         return {
             "module": MODULE_NAME,
             "version": MODULE_VERSION,
             "task": "multi_modal_landmine_detection",
-            "num_classes": 35,
+            "num_classes": num_classes,
             "modalities": ["rgb", "lwir", "swir"],
             "input_size": [640, 640],
         }

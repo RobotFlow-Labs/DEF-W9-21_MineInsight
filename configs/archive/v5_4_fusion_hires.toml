@@ -1,0 +1,72 @@
+# v5.4 — Escape 1.52 plateau via batch scaling
+# Doubles batch (12→24) + linearly scales LR (5e-5→1e-4)
+# Targets 60-80% of L4 VRAM (~18GB)
+# Resumes from v5 ep54 best (val=1.52)
+
+[model]
+architecture = "yolov8"
+backbone = "cspdarknet_nano"
+num_classes = 58
+input_size = [1280, 1280]
+modality = "rgb+lwir"
+pretrained = ""
+
+[model.fusion]
+enabled = true
+method = "attention"
+fusion_channels = 256
+
+[training]
+batch_size = 24
+learning_rate = 0.0001
+epochs = 150
+optimizer = "adamw"
+weight_decay = 0.01
+scheduler = "cosine"
+warmup_ratio = 0.02
+precision = "bf16"
+gradient_accumulation = 1
+max_grad_norm = 1.0
+seed = 42
+
+[data]
+dataset_root = "/mnt/train-data/datasets/mineinsight"
+train_sequences = ["track_1_s1", "track_2_s1"]
+val_sequences = ["track_2_s1"]
+test_sequences = ["track_2_s1"]
+num_workers = 6
+pin_memory = true
+
+[data.augmentation]
+mosaic = true
+mixup = true
+hsv_h = 0.02
+hsv_s = 0.8
+hsv_v = 0.5
+flip_lr = 0.5
+flip_ud = 0.0
+scale = [0.3, 1.7]
+
+[loss]
+box_weight = 5.0
+cls_weight = 2.0
+box_loss = "ciou"
+cls_loss = "focal"
+focal_alpha = 0.25
+focal_gamma = 2.0
+
+[checkpoint]
+output_dir = "/mnt/artifacts-datai/checkpoints/project_mineinsight_v5_4_fusion_hires"
+save_every_n_steps = 500
+keep_top_k = 2
+metric = "val_loss"
+mode = "min"
+
+[early_stopping]
+enabled = true
+patience = 15
+min_delta = 0.001
+
+[logging]
+log_dir = "/mnt/artifacts-datai/logs/project_mineinsight_v5_4_fusion_hires"
+tensorboard_dir = "/mnt/artifacts-datai/tensorboard/project_mineinsight_v5_4_fusion_hires"

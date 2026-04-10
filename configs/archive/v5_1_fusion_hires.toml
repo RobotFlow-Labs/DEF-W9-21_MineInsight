@@ -1,10 +1,5 @@
-# MineInsight v5 — HiRes 1280 + Hungarian Matcher + DETR Loss
-# Canonical LEGACY config for the failed custom CSPDarknet+Hungarian model.
-# Kept for reproducibility of the v5 baseline (mAP@0.5=0.010, val_loss=1.5422).
-# NOTE: train_sequences and val_sequences previously contained track_2_s1 in
-# both — see the FIX below. The data-leak-fixed version lives in the pivot
-# pipeline (scripts/build_fusion_dataset.py + data_mixed.yaml).
-# For NEW work, use scripts/train_yolo26_fusion.py, NOT this config.
+# MineInsight v4 — HiRes 1280 + Hungarian Matcher + DETR Loss
+# THE fix: proper detection with bipartite matching
 
 [model]
 architecture = "yolov8"
@@ -21,7 +16,7 @@ fusion_channels = 256
 
 [training]
 batch_size = 12
-learning_rate = 0.0003
+learning_rate = 0.0001
 epochs = 150
 optimizer = "adamw"
 weight_decay = 0.01
@@ -34,10 +29,7 @@ seed = 42
 
 [data]
 dataset_root = "/mnt/train-data/datasets/mineinsight"
-# FIX: remove the track_2_s1 data leak. track_2_s1 was previously in both
-# train and val. Use track_1_* for training and track_2_s1 for validation
-# only.
-train_sequences = ["track_1_s1", "track_1_s2"]
+train_sequences = ["track_1_s1", "track_2_s1"]
 val_sequences = ["track_2_s1"]
 test_sequences = ["track_2_s1"]
 num_workers = 4
@@ -62,7 +54,7 @@ focal_alpha = 0.25
 focal_gamma = 2.0
 
 [checkpoint]
-output_dir = "/mnt/artifacts-datai/checkpoints/project_mineinsight_v5_fusion_hires"
+output_dir = "/mnt/artifacts-datai/checkpoints/project_mineinsight_v5_1_fusion_hires"
 save_every_n_steps = 500
 keep_top_k = 2
 metric = "val_loss"
@@ -74,5 +66,5 @@ patience = 30
 min_delta = 0.001
 
 [logging]
-log_dir = "/mnt/artifacts-datai/logs/project_mineinsight_v5_fusion_hires"
-tensorboard_dir = "/mnt/artifacts-datai/tensorboard/project_mineinsight_v5_fusion_hires"
+log_dir = "/mnt/artifacts-datai/logs/project_mineinsight_v5_1_fusion_hires"
+tensorboard_dir = "/mnt/artifacts-datai/tensorboard/project_mineinsight_v5_1_fusion_hires"

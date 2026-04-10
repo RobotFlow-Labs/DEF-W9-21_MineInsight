@@ -10,10 +10,14 @@ Falls back to pure PyTorch when CUDA kernels are unavailable.
 
 from __future__ import annotations
 
+import logging
 import sys
+import warnings
 from pathlib import Path
 
 import torch
+
+log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Shared CUDA kernel paths
@@ -25,16 +29,24 @@ _LOADED = False
 _detection_ops = None
 _fused_preprocess = None
 _nms_2d_fn = None
+_load_errors: dict[str, str] = {}
 
 
 def _ensure_loaded() -> None:
-    """Lazy-load shared CUDA extensions once."""
+    """Lazy-load shared CUDA extensions once.
+
+    Any kernel that fails to load is recorded in ``_load_errors`` and a
+    ``RuntimeWarning`` is emitted the first time the fallback path is triggered
+    (previously the fallback was silent, which hid ~10× slowdowns in serving).
+    Call :func:`cuda_kernels_available` at startup to surface errors early.
+    """
     global _LOADED, _detection_ops, _fused_preprocess, _nms_2d_fn
     if _LOADED:
         return
     _LOADED = True
 
     if not torch.cuda.is_available():
+        _load_errors["cuda"] = "torch.cuda.is_available() returned False"
         return
 
     # detection_ops
@@ -44,8 +56,8 @@ def _ensure_loaded() -> None:
     try:
         import detection_ops as _det
         _detection_ops = _det
-    except ImportError:
-        pass
+    except ImportError as e:
+        _load_errors["detection_ops"] = str(e)
 
     # fused_image_preprocess
     prep_path = str(_CUDA_EXT_ROOT / "fused_image_preprocess")
@@ -54,8 +66,8 @@ def _ensure_loaded() -> None:
     try:
         import fused_image_preprocess as _prep
         _fused_preprocess = _prep
-    except ImportError:
-        pass
+    except ImportError as e:
+        _load_errors["fused_image_preprocess"] = str(e)
 
     # vectorized_nms (parent dir must be on path for package import)
     nms_parent = str(_CUDA_EXT_ROOT)
@@ -64,8 +76,28 @@ def _ensure_loaded() -> None:
     try:
         from vectorized_nms import nms_2d
         _nms_2d_fn = nms_2d
-    except ImportError:
-        pass
+    except ImportError as e:
+        _load_errors["vectorized_nms"] = str(e)
+
+    # Summary log so every startup reports the CUDA kernel status exactly once
+    loaded = [
+        name for name, obj in (
+            ("detection_ops", _detection_ops),
+            ("fused_image_preprocess", _fused_preprocess),
+            ("vectorized_nms", _nms_2d_fn),
+        ) if obj is not None
+    ]
+    missing = list(_load_errors.keys())
+    if missing:
+        msg = (
+            f"[mineinsight.cuda_ops] loaded {loaded} but MISSING {missing}. "
+            f"Falling back to pure PyTorch (slow). "
+            f"Errors: {_load_errors}"
+        )
+        log.warning(msg)
+        warnings.warn(msg, RuntimeWarning, stacklevel=3)
+    else:
+        log.info(f"[mineinsight.cuda_ops] all CUDA kernels loaded: {loaded}")
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +186,9 @@ def cuda_focal_loss(
 # CUDA-accelerated NMS
 # ---------------------------------------------------------------------------
 
+_NMS_FALLBACK_WARNED = False
+
+
 def cuda_nms_2d(
     boxes: torch.Tensor,
     scores: torch.Tensor,
@@ -169,6 +204,7 @@ def cuda_nms_2d(
     Returns:
         Indices of kept boxes.
     """
+    global _NMS_FALLBACK_WARNED
     _ensure_loaded()
 
     if _nms_2d_fn is not None and boxes.is_cuda:
@@ -177,6 +213,22 @@ def cuda_nms_2d(
             scores.contiguous().float(),
             iou_threshold,
         )
+
+    # PyTorch fallback — O(N²) per-call. Warn ONCE so production code surfaces
+    # the performance regression instead of silently slowing down by 10×.
+    if not _NMS_FALLBACK_WARNED:
+        _NMS_FALLBACK_WARNED = True
+        reason = _load_errors.get(
+            "vectorized_nms",
+            "CUDA kernel unavailable (boxes on CPU?)",
+        )
+        msg = (
+            f"[cuda_nms_2d] falling back to pure-Python NMS "
+            f"(reason: {reason}). This is O(N²) and slow — "
+            f"expect ~10× latency regression in inference hot paths."
+        )
+        log.warning(msg)
+        warnings.warn(msg, RuntimeWarning, stacklevel=2)
 
     # PyTorch fallback
     order = scores.argsort(descending=True)
